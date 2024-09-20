@@ -1,0 +1,40 @@
+# cache folders
+**/__pycache__/
+.vscode/*
+
+
+# custom folders
+**/o1/** 
+stereo-fusion/*
+archive-svo-files/*
+svo-archives/* 
+**/svo_output/
+!svo_output/
+test/*
+
+# pipeline-folders
+output/*
+input/*
+config/*
+svo-test/*
+output-backend/*
+input-backend/*
+logs/*
+
+# file types
+*.bin
+*.ply
+*.png
+*.jpg
+*.jpeg
+*.swp
+
+*.out
+*.fuse*
+*.svo*
+*.txt
+*.zip
+*.log
+*.pt
+*.gitkeep
+*.pyc
