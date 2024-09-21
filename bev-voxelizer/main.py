@@ -34,43 +34,54 @@ def key_callback(vis):
 
     return False
 
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO) 
-
-    src_folder = "ply/segmented-1056_to_1198/"
-    random_segmented_pcd = get_random_segmented_pcd(src_folder)
-    
-    point_cloud = o3d.io.read_point_cloud(random_segmented_pcd)
-    
-    vis = o3d.visualization.VisualizerWithKeyCallback()
-    vis.create_window()
-    vis.add_geometry(point_cloud)
-    
+def update_camera_view(vis, point_cloud):
     # Create coordinate frame
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=100, origin=[0, 0, 0])
     vis.add_geometry(coordinate_frame)
 
     # Set the camera view to be at the pointcloud origin
     ctr = vis.get_view_control()
-    
-    # Get the bounding box of the point cloud
-    bbox = point_cloud.get_axis_aligned_bounding_box()
+
+    bbox = point_cloud.to_legacy().get_axis_aligned_bounding_box()
     bbox_min = bbox.get_min_bound()
     bbox_max = bbox.get_max_bound()
     dimensions = bbox_max - bbox_min
 
     center = bbox.get_center()
     ctr.set_lookat(center)
-     
-    logger.info(f"center: {center}")
     
     # Set the camera position 
     ctr.set_front([0, 0, -1])  # Looking along negative z-axis
     ctr.set_up([0, -1, 0])     # Up direction is negative y-axis (Open3D convention)
     ctr.set_zoom(0.8)
 
+    return vis
     
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO) 
+
+    src_folder = "ply/segmented-1056_to_1198/"
+    random_pointcloud_path = get_random_segmented_pcd(src_folder)
+    
+    point_cloud = o3d.t.io.read_point_cloud(random_pointcloud_path)
+
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    vis.add_geometry(point_cloud.to_legacy())
+    vis = update_camera_view(vis, point_cloud)
+    
+    # Print attributes of the first 3 points in point_cloud
+    # num_points = min(3, point_cloud.point.positions.shape[0])
+    # for i in range(num_points):s
+    #     logger.info(f"Point {i + 1} attributes:")
+    #     for attr_name in point_cloud.point:
+    #         attr_value = point_cloud.point[attr_name][i]
+    #         logger.info(f"  {attr_name}: {attr_value}")
+    #     logger.info("---")
+
+
 
 
 
