@@ -1,63 +1,57 @@
 #! /usr/bin/env python3
-
 import open3d as o3d    
 import os
 import shutil
 import logging, coloredlogs
 from pathlib import Path
+from tqdm import tqdm
+import random
+import numpy as np  
 
-# custom imports
+# custom modules
 from utils import io_utils
 
 logger = logging.getLogger(__name__)
+coloredlogs.install(level='DEBUG', logger=logger, force=True)
 
-
-def extract_and_rename_ply_files(
-    source_folder: Path,
-    dest_folder: Path = None
-) -> None:
+def get_random_segmented_pcd(src_foler: Path) -> Path: 
+    '''
+    Get a random ply file from the source folder
+    '''    
+    ply_files = [f for f in os.listdir(src_folder) if f.endswith('.ply')]
+    if ply_files:
+        random_ply_file = random.choice(ply_files)
+        random_ply_path = os.path.join(src_folder, random_ply_file)
     
-    base_folder = os.path.dirname(source_folder)
-    src_folder_name = os.path.basename(source_folder)
-
-    if dest_folder is None: 
-        dest_folder = os.path.join(base_folder, f"segmented-{src_folder_name}")
-
-    io_utils.create_folders([dest_folder])
-    
-    # Walk through all directories and subdirectories
-    for i, (root, dirs, files) in enumerate(os.walk(source_folder)):
-        if "left-segmented-labelled.ply" in files:
-            source_file = os.path.join(root, "left-segmented-labelled.ply")
-            
-            if os.path.exists(source_file):
-                # Create a unique filename based on the subfolder structure
-                destination_file = os.path.join(dest_folder, f"{i}.ply")
-
-                logger.warning(f"source_file: {source_file}")   
-                logger.warning(f"destination_file: {destination_file}")
-                shutil.copy(source_file, destination_file)
-            
-            else:
-                logger.warning(f"Source file not found: {source_file}")
-                continue
-            # Copy and rename the file
-            # shutil.copy(source_file, destination_file)
-            # logging.info(f"Copied and renamed: {source_file} -> {destination_file}")
+    return random_ply_path
 
 
+def key_callback(vis):
+    logger.warning(f"===================")
+    logger.warning(f"KEYBACK TRIGGERED!")
+    logger.warning(f"===================")
+    print('key')
 
-# extracts left-segmented.ply files 
-# from the sfm folder
-def collect_segmented_ply_files(sfm_folder):
-    pass
+    return False
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO) 
 
-    src_folder = Path("ply/1056_to_1198/")
-    extract_and_rename_ply_files(src_folder)
+    src_folder = "ply/segmented-1056_to_1198/"
+    random_segmented_pcd = get_random_segmented_pcd(src_folder)
+    
+    point_cloud = o3d.io.read_point_cloud(random_segmented_pcd)
+    
+    vis = o3d.visualization.VisualizerWithKeyCallback()
+    vis.create_window()
+    vis.add_geometry(point_cloud)
 
-    # pcd = o3d.t.io.read_point_cloud("ply_segmented/1056_to_1198/")
-    # print(pcd)
+    # vis.register_key_callback(120, key_callback)
+    vis.register_key_callback(ord("X"), key_callback)
+
+    vis.run()
+    vis.destroy_window()
+    
+
+    
