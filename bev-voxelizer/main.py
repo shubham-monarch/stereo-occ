@@ -46,9 +46,33 @@ if __name__ == "__main__":
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
     vis.add_geometry(point_cloud)
+    
+    # Create coordinate frame
+    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=100, origin=[0, 0, 0])
+    vis.add_geometry(coordinate_frame)
 
-    # vis.register_key_callback(120, key_callback)
-    vis.register_key_callback(ord("X"), key_callback)
+    # Set the camera view to be at the pointcloud origin
+    ctr = vis.get_view_control()
+    
+    # Get the bounding box of the point cloud
+    bbox = point_cloud.get_axis_aligned_bounding_box()
+    bbox_min = bbox.get_min_bound()
+    bbox_max = bbox.get_max_bound()
+    dimensions = bbox_max - bbox_min
+
+    center = bbox.get_center()
+    ctr.set_lookat(center)
+     
+    logger.info(f"center: {center}")
+    
+    # Set the camera position 
+    ctr.set_front([0, 0, -1])  # Looking along negative z-axis
+    ctr.set_up([0, -1, 0])     # Up direction is negative y-axis (Open3D convention)
+    ctr.set_zoom(0.8)
+
+    
+
+
 
     vis.run()
     vis.destroy_window()
