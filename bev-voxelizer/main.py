@@ -12,7 +12,7 @@ import numpy as np
 from utils import io_utils
 
 logger = logging.getLogger(__name__)
-coloredlogs.install(level='DEBUG', logger=logger, force=True)
+coloredlogs.install(level='INFO', logger=logger, force=True)
 
 def get_random_segmented_pcd(src_foler: Path) -> Path: 
     '''
@@ -26,13 +26,14 @@ def get_random_segmented_pcd(src_foler: Path) -> Path:
     return random_ply_path
 
 
-def key_callback(vis):
-    logger.warning(f"===================")
-    logger.warning(f"KEYBACK TRIGGERED!")
-    logger.warning(f"===================")
-    print('key')
+# def key_callback(vis):
+#     logger.warning(f"===================")
+#     logger.warning(f"KEYBACK TRIGGERED!")
+#     logger.warning(f"===================")
+#     print('key')
 
-    return False
+#     return False
+
 
 def update_camera_view(vis, point_cloud):
     # Create coordinate frame
@@ -60,8 +61,7 @@ def update_camera_view(vis, point_cloud):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO) 
-
+    
     src_folder = "ply/segmented-1056_to_1198/"
     random_pointcloud_path = get_random_segmented_pcd(src_folder)
     
@@ -70,23 +70,29 @@ if __name__ == "__main__":
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     vis.add_geometry(point_cloud.to_legacy())
+    
+    # adjusting default camera view for better visualization
     vis = update_camera_view(vis, point_cloud)
     
-    # Print attributes of the first 3 points in point_cloud
-    # num_points = min(3, point_cloud.point.positions.shape[0])
-    # for i in range(num_points):s
-    #     logger.info(f"Point {i + 1} attributes:")
-    #     for attr_name in point_cloud.point:
-    #         attr_value = point_cloud.point[attr_name][i]
-    #         logger.info(f"  {attr_name}: {attr_value}")
-    #     logger.info("---")
+    
+    # pointcloud_legacy = point_cloud.to_legacy()
+    
+    num_points = point_cloud.point.positions.shape[0]
+    logger.info(f"num_points: {num_points}")
+
+    for i in range(min(1, num_points)):
+        logger.info(f"Point {i + 1}:")
+        x, y, z = point_cloud.point.positions[i].numpy()
+        r, g, b = point_cloud.point.colors[i].numpy()
+        label = point_cloud.point.label[i].item()
+        logger.info(f"  x: {x:.6f}, y: {y:.6f}, z: {z:.6f}")
+        logger.info(f"  r: {r:.6f}, g: {g:.6f}, b: {b:.6f}")
+        logger.info(f"  label: {label}")
+        logger.info("---")
 
 
-
-
-
-    vis.run()
-    vis.destroy_window()
+    # vis.run()
+    # vis.destroy_window()
     
 
     
