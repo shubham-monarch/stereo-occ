@@ -51,11 +51,24 @@ def update_camera_view(vis, point_cloud):
     
     # Set the camera position 
     ctr.set_front([0, 0, -1])  # Looking along negative z-axis
-    ctr.set_up([0, -1, 0])     # Up direction is negative y-axis (Open3D convention)
+    # ctr.set_up([0, 1, 0])     # Up direction is negative y-axis (Open3D convention)
+    
     ctr.set_zoom(0.8)
 
     return vis
-    
+
+
+def calculate_angles(normal_vector):
+        x_axis = np.array([1, 0, 0])
+        y_axis = np.array([0, 1, 0])
+        z_axis = np.array([0, 0, 1])
+        
+        angle_x = np.arccos(np.dot(normal_vector, x_axis) / np.linalg.norm(normal_vector))
+        angle_y = np.arccos(np.dot(normal_vector, y_axis) / np.linalg.norm(normal_vector))
+        angle_z = np.arccos(np.dot(normal_vector, z_axis) / np.linalg.norm(normal_vector))
+        
+        return np.degrees(angle_x), np.degrees(angle_y), np.degrees(angle_z)
+     
 
 
 if __name__ == "__main__":
@@ -86,21 +99,7 @@ if __name__ == "__main__":
     vis = update_camera_view(vis, pcd)
     
     
-    # pointcloud_legacy = point_cloud.to_legacy()
     
-    num_points = pcd.point.positions.shape[0]
-    logger.info(f"num_points: {num_points}")
-
-    for i in range(min(1, num_points)):
-        logger.info(f"Point {i + 1}:")
-        x, y, z = pcd.point.positions[i].numpy()
-        r, g, b = pcd.point.colors[i].numpy()
-        label = pcd.point.label[i].item()
-        logger.info(f"  x: {x:.6f}, y: {y:.6f}, z: {z:.6f}")
-        logger.info(f"  r: {r:.6f}, g: {g:.6f}, b: {b:.6f}")
-        logger.info(f"  label: {label}")
-        logger.info("---")
-
     # Filter points with label value 2 (ground)
     ground_mask = pcd.point["label"] == 2
     pcd_ground = pcd.select_by_index(ground_mask.nonzero()[0])
@@ -111,59 +110,54 @@ if __name__ == "__main__":
                                                     num_iterations=1000)
     [a, b, c, d] = ground_plane_model.numpy()
 
-   
     # Calculate the normal vector of the ground plane
     normal = np.array([a, b, c])
     normal = normal / np.linalg.norm(normal)  # Normalize the vector
 
     # Calculate the rotation matrix to align the normal with the y-axis
-    y_axis = np.array([0, -1, 0])  # Changed to negative y-axis
-    rotation_axis = np.cross(normal, y_axis)
-    rotation_axis = rotation_axis / np.linalg.norm(rotation_axis)
+    y_axis = np.array([0, 1, 0])
+    v = np.cross(normal, y_axis)
+    s = np.linalg.norm(v)
+    c = np.dot(normal, y_axis)
+    I = np.eye(3)
+    vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    R = I + vx + np.dot(vx, vx) * ((1 - c) / (s ** 2))
+
+    # Apply the rotation to the ground normal
+    transformed_normal = np.dot(normal, R.T)
+
+    # Calculate angles for pcd_ground
+    angles_ground = calculate_angles(normal)
+    logger.info(f"Angles of pcd_ground with x, y, z axes: {angles_ground}")
+
+    # Calculate angles for pcd_ground_transformed
+    angles_transformed = calculate_angles(transformed_normal)
+    logger.info(f"Angles of pcd_ground_transformed with x, y, z axes: {angles_transformed}")
+
+
+    # Transform all the points in pcd_ground using the rotation matrix R
+    pcd_ground_transformed = pcd_ground.translate((0, 0, 0), relative=False)
+    pcd_ground_transformed.rotate(R, center=(0, 0, 0))
     
-    cos_theta = np.dot(normal, y_axis)
-    sin_theta = np.sqrt(1 - cos_theta**2)
-    
-    # Rodrigues' rotation formula
-    K = np.array([
-        [0, -rotation_axis[2], rotation_axis[1]],
-        [rotation_axis[2], 0, -rotation_axis[0]],
-        [-rotation_axis[1], rotation_axis[0], 0]
-    ])
-    rotation_matrix = np.eye(3) + sin_theta * K + (1 - cos_theta) * np.dot(K, K)
+    num_points_ground = len(pcd_ground.point.positions)
+    num_points_ground_transformed = len(pcd_ground_transformed.point.positions)
+    print(f"Number of points in pcd_ground: {num_points_ground}")
+    print(f"Number of points in pcd_ground_transformed: {num_points_ground_transformed}")
 
-    # Apply the rotation to the entire point cloud
-    pcd_corrected.point.positions = o3d.core.Tensor(np.dot(pcd_original.point.positions.numpy(), rotation_matrix.T))
-    # Paint pcd_corrected to red
-    # pcd_corrected.paint_uniform_color([1.0, 0.0, 0.0])  # Red color in RGB
-    
-    vis.add_geometry(pcd_corrected.to_legacy())   
-    vis.add_geometry(pcd_original.to_legacy())
+    # Paint pcd_ground_transformed to yellow
+    pcd_ground_transformed.paint_uniform_color([0.0, 1.0, 0.0])  # Green color
 
-    # Save pcd_corrected to disk as .ply file
-    output_path = "corrected_pointcloud.ply"
-    o3d.io.write_point_cloud(output_path, pcd_corrected.to_legacy())
-    logger.info(f"Corrected point cloud saved to {output_path}")
+    # Paint pcd_ground to blue
+    pcd_ground.paint_uniform_color([0.0, 0.0, 1.0])  # Blue color
 
-    # # Update the ground points
-    # pcd_ground = pcd.select_by_index(ground_mask.nonzero()[0])
+    # Add both geometries to the visualizer
+    # vis.add_geometry(pcd_ground_transformed.to_legacy())
+    vis.add_geometry(pcd_ground.to_legacy())
 
-    # # Recalculate inliers and outliers with the rotated point cloud
-    # _, inliers = pcd_ground.segment_plane(distance_threshold=0.01,
-    #                                       ransac_n=3,
-    #                                       num_iterations=1000)
+    # # vis.add_geometry(pcd.to_legacy())
+    # vis.add_geometry(pcd_ground_transformed.to_legacy())
 
-    # inlier_cloud = pcd_ground.select_by_index(inliers)
-    # inlier_cloud.paint_uniform_color([1.0, 1.0, 0.0])
-    
-    # # outlier_cloud = pcd_ground.select_by_index(inliers, invert=True)
-    # # outlier_cloud.paint_uniform_color([0.0, 0.0, 0.0])
 
-    # vis.add_geometry(inlier_cloud.to_legacy())
-    # # vis.add_geometry(pcd_ground.to_legacy())
-
-    # # Update the camera view for the rotated point cloud
-    # # vis = update_camera_view(vis, pcd)
 
     vis.run()
     vis.destroy_window()
