@@ -25,50 +25,16 @@ def get_random_segmented_pcd(src_foler: Path) -> Path:
     
     return random_ply_path
 
-
-# def key_callback(vis):
-#     logger.warning(f"===================")
-#     logger.warning(f"KEYBACK TRIGGERED!")
-#     logger.warning(f"===================")
-#     print('key')
-
-#     return False
-
-
-# def update_camera_view(vis, point_cloud):
-#     # Create coordinate frame
-    
-#     # Set the camera view to be at the pointcloud origin
-#     ctr = vis.get_view_control()
-
-#     bbox = point_cloud.to_legacy().get_axis_aligned_bounding_box()
-#     bbox_min = bbox.get_min_bound()
-#     bbox_max = bbox.get_max_bound()
-#     dimensions = bbox_max - bbox_min
-
-#     center = bbox.get_center()
-#     # ctr.set_lookat(center)
-    
-#     # Set the camera position 
-#     # ctr.set_front([0, 0, -1])  # Looking along negative z-axis
-#     # ctr.set_up([0, 1, 0])     # Up direction is negative y-axis (Open3D convention)
-
-#     # ctr.set_zoom(0.8)
-
-#     return vis
-
-
 def calculate_angles(normal_vector):
-        x_axis = np.array([1, 0, 0])
-        y_axis = np.array([0, 1, 0])
-        z_axis = np.array([0, 0, 1])
-        
-        angle_x = np.arccos(np.dot(normal_vector, x_axis) / np.linalg.norm(normal_vector))
-        angle_y = np.arccos(np.dot(normal_vector, y_axis) / np.linalg.norm(normal_vector))
-        angle_z = np.arccos(np.dot(normal_vector, z_axis) / np.linalg.norm(normal_vector))
-        
-        return np.degrees(angle_x), np.degrees(angle_y), np.degrees(angle_z)
-
+    x_axis = np.array([1, 0, 0])
+    y_axis = np.array([0, 1, 0])
+    z_axis = np.array([0, 0, 1])
+    
+    angle_x = np.arccos(np.dot(normal_vector, x_axis) / np.linalg.norm(normal_vector))
+    angle_y = np.arccos(np.dot(normal_vector, y_axis) / np.linalg.norm(normal_vector))
+    angle_z = np.arccos(np.dot(normal_vector, z_axis) / np.linalg.norm(normal_vector))
+    
+    return np.degrees(angle_x), np.degrees(angle_y), np.degrees(angle_z)
 
 def get_class_pointcloud(pcd, class_label):
     '''
@@ -127,27 +93,36 @@ if __name__ == "__main__":
     vis = o3d.visualization.Visualizer()
     vis.create_window()
 
-    # add co-ordinate frame to vis window    
+    # co-ordinate frame for vis window    
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=10, origin=[0, 0, 0])
-    vis.add_geometry(coordinate_frame)
-
+    
     # tilt correction
     R = compute_pcd_tilt(pcd)
     pcd_ground = get_class_pointcloud(pcd, 2)
     
-    # rotate pcd_ground_
+    # pcd_ground correction
     pcd_ground_ = pcd_ground.clone()
     pcd_ground_.rotate(R, center=(0, 0, 0))
     
-    # paint yellow
-    pcd_ground_.paint_uniform_color([1.0, 1.0, 0.0])  # RGB values for yellow
-    vis.add_geometry(pcd_ground_.to_legacy())
+    # paint black
+    pcd_ground_.paint_uniform_color([0.0, 0.0, 0.0])  # RGB values for black
+    
+    # pcd correction
+    pcd_ = pcd.clone()
+    pcd_.rotate(R, center=(0, 0, 0))
+    # pcd_.translate((0, -5, 0))
+    # pcd_.paint_uniform_color([1.0, 1.0, 0.0])  # RGB values for yellow
 
+    # updating vis window    
+    vis.add_geometry(pcd_.to_legacy())
+    vis.add_geometry(pcd_ground_.to_legacy())
+    vis.add_geometry(coordinate_frame)
 
     # adjust camera view
     view_ctr = vis.get_view_control()
     view_ctr.set_front(np.array([0, 0, -1]))
     view_ctr.set_up(np.array([0, -1, 0]))
+    # view_ctr.set_up(np.array([0, 1, 0]))
     
     vis.run()
     vis.destroy_window()
