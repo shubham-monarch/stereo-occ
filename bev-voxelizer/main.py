@@ -101,73 +101,51 @@ def align_normal_to_y_axis(normal_):
     R = I + vx + np.dot(vx, vx) * ((1 - c) / (s ** 2))
     return R
 
+def compute_pcd_tilt(pcd):
+    '''
+    Compute the tilt of the point cloud
+    '''
+    normal, _ = get_class_plane(pcd, 2)
+    R = align_normal_to_y_axis(normal)
+    
+    # check normal
+    normal_ = np.dot(normal, R.T)
+    angles_transformed = calculate_angles(normal_)
+    logger.info(f"Angles of normal_ with x, y, z axes: {angles_transformed}")
+
+    return R
+    
+
 if __name__ == "__main__":
     
     src_folder = "ply/segmented-1056_to_1198/"
     random_pointcloud_path = get_random_segmented_pcd(src_folder)
     
     pcd = o3d.t.io.read_point_cloud(random_pointcloud_path)
-    pcd_original = pcd.clone()
-    pcd_corrected = pcd.clone()
     
-    # Paint the entire point cloud yellow
-    yellow_color = np.array([1.0, 1.0, 0.0])  # RGB values for yellow
-    num_points = pcd_original.point.positions.shape[0]
-    pcd_original.point.colors = o3d.core.Tensor(np.tile(yellow_color, (num_points, 1)))
-
+    # visualization wind
     vis = o3d.visualization.Visualizer()
     vis.create_window()
-    
+
+    # add co-ordinate frame to vis window    
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=10, origin=[0, 0, 0])
     vis.add_geometry(coordinate_frame)
 
+    # tilt correction
+    R = compute_pcd_tilt(pcd)
     pcd_ground = get_class_pointcloud(pcd, 2)
-
     
-    normal_, _ = get_class_plane(pcd, 2)
-    logger.info(f"Normal_: {normal_}")  
-
-    R = align_normal_to_y_axis(normal_)
-
-    # Apply the rotation to the ground normal
-    # transformed_normal = np.dot(normal_, R.T)
-
-
-    # Calculate angles for pcd_ground
-    # angles_ground = calculate_angles(normal_)
-    # logger.info(f"Angles of pcd_ground with x, y, z axes: {angles_ground}")
-
-    # # Calculate angles for pcd_ground_transformed
-    # angles_transformed = calculate_angles(transformed_normal)
-    # logger.info(f"Angles of pcd_ground_transformed with x, y, z axes: {angles_transformed}")
-
-
-    # Transform all the points in pcd_ground using the rotation matrix R
-    pcd_ground_transformed = pcd_ground.translate((0, 0, 0), relative=False)
-    pcd_ground_transformed.rotate(R, center=(0, 0, 0))
+    # rotate pcd_ground_
+    pcd_ground_ = pcd_ground.clone()
+    pcd_ground_.rotate(R, center=(0, 0, 0))
     
-    num_points_ground = len(pcd_ground.point.positions)
-    num_points_ground_transformed = len(pcd_ground_transformed.point.positions)
-    print(f"Number of points in pcd_ground: {num_points_ground}")
-    print(f"Number of points in pcd_ground_transformed: {num_points_ground_transformed}")
+    # paint yellow
+    pcd_ground_.paint_uniform_color([1.0, 1.0, 0.0])  # RGB values for yellow
+    vis.add_geometry(pcd_ground_.to_legacy())
 
-    # Paint pcd_ground_transformed to yellow
-    pcd_ground_transformed.paint_uniform_color([0.0, 1.0, 0.0])  # Green color
 
-    # Paint pcd_ground to blue
-    pcd_ground.paint_uniform_color([0.0, 0.0, 1.0])  # Blue color
-
-    # Add both geometries to the visualizer
-    # vis.add_geometry(pcd_ground_transformed.to_legacy())
-    vis.add_geometry(pcd_ground.to_legacy())
-
-    # # vis.add_geometry(pcd.to_legacy())
-    # vis.add_geometry(pcd_ground_transformed.to_legacy())
-
-    # update camera view
+    # adjust camera view
     view_ctr = vis.get_view_control()
-    
-    # view_ctr.rotate(180, 0)
     view_ctr.set_front(np.array([0, 0, -1]))
     view_ctr.set_up(np.array([0, -1, 0]))
     
