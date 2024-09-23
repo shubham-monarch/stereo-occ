@@ -68,8 +68,38 @@ def calculate_angles(normal_vector):
         angle_z = np.arccos(np.dot(normal_vector, z_axis) / np.linalg.norm(normal_vector))
         
         return np.degrees(angle_x), np.degrees(angle_y), np.degrees(angle_z)
-     
 
+
+def get_class_pointcloud(pcd, class_label):
+    '''
+    Get the point cloud of a specific class
+    '''
+    mask = pcd.point["label"] == class_label
+    pcd_labels = pcd.select_by_index(mask.nonzero()[0])
+    return pcd_labels
+
+def get_class_plane(pcd, class_label):
+    '''
+    Get the inliers / normal vector for the labelled pointcloud
+    '''
+    pcd_class = get_class_pointcloud(pcd, class_label)
+    plane_model, inliers = pcd_class.segment_plane(distance_threshold=0.01,
+                                                    ransac_n=3,
+                                                    num_iterations=1000)
+    [a, b, c, d] = plane_model.numpy()
+    normal = np.array([a, b, c])
+    normal = normal / np.linalg.norm(normal) 
+    return normal, inliers
+
+def align_normal_to_y_axis(normal_):
+    y_axis = np.array([0, 1, 0])
+    v = np.cross(normal_, y_axis)
+    s = np.linalg.norm(v)
+    c = np.dot(normal_, y_axis)
+    I = np.eye(3)
+    vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    R = I + vx + np.dot(vx, vx) * ((1 - c) / (s ** 2))
+    return R
 
 if __name__ == "__main__":
     
@@ -87,52 +117,29 @@ if __name__ == "__main__":
 
     vis = o3d.visualization.Visualizer()
     vis.create_window()
-
-    # add segmented-pointcloud to vis windows
-    # vis.add_geometry(point_cloud.to_legacy())
-
-    # add coordinate frame to vis window
+    
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=10, origin=[0, 0, 0])
     vis.add_geometry(coordinate_frame)
 
-    # adjusting default camera view for better visualization
-    # vis = update_camera_view(vis, pcd)
-    
-    
-    
-    # Filter points with label value 2 (ground)
-    ground_mask = pcd.point["label"] == 2
-    pcd_ground = pcd.select_by_index(ground_mask.nonzero()[0])
+    pcd_ground = get_class_pointcloud(pcd, 2)
 
-    # Fit a plane to the ground points
-    ground_plane_model, inliers = pcd_ground.segment_plane(distance_threshold=0.01,
-                                                    ransac_n=3,
-                                                    num_iterations=1000)
-    [a, b, c, d] = ground_plane_model.numpy()
+    
+    normal_, _ = get_class_plane(pcd, 2)
+    logger.info(f"Normal_: {normal_}")  
 
-    # Calculate the normal vector of the ground plane
-    normal = np.array([a, b, c])
-    normal = normal / np.linalg.norm(normal)  # Normalize the vector
-
-    # Calculate the rotation matrix to align the normal with the y-axis
-    y_axis = np.array([0, 1, 0])
-    v = np.cross(normal, y_axis)
-    s = np.linalg.norm(v)
-    c = np.dot(normal, y_axis)
-    I = np.eye(3)
-    vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-    R = I + vx + np.dot(vx, vx) * ((1 - c) / (s ** 2))
+    R = align_normal_to_y_axis(normal_)
 
     # Apply the rotation to the ground normal
-    transformed_normal = np.dot(normal, R.T)
+    # transformed_normal = np.dot(normal_, R.T)
+
 
     # Calculate angles for pcd_ground
-    angles_ground = calculate_angles(normal)
-    logger.info(f"Angles of pcd_ground with x, y, z axes: {angles_ground}")
+    # angles_ground = calculate_angles(normal_)
+    # logger.info(f"Angles of pcd_ground with x, y, z axes: {angles_ground}")
 
-    # Calculate angles for pcd_ground_transformed
-    angles_transformed = calculate_angles(transformed_normal)
-    logger.info(f"Angles of pcd_ground_transformed with x, y, z axes: {angles_transformed}")
+    # # Calculate angles for pcd_ground_transformed
+    # angles_transformed = calculate_angles(transformed_normal)
+    # logger.info(f"Angles of pcd_ground_transformed with x, y, z axes: {angles_transformed}")
 
 
     # Transform all the points in pcd_ground using the rotation matrix R
