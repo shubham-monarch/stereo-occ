@@ -23,7 +23,12 @@ from utils import io_utils
 # - farthest point sampling
 # - statistical outlier removal
 
+# LOGGING SETUP
 logger = logging.getLogger(__name__)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(lineno)d')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 coloredlogs.install(level='INFO', logger=logger, force=True)
 
 def get_random_segmented_pcd(src_foler: Path) -> Path: 
@@ -53,10 +58,15 @@ def axis_angles(vec):
 
 def get_class_pointcloud(pcd, class_label):
     '''
-    Get the point cloud of a specific class
+    Returns class-specific point cloud
     '''
+    logger.warning(f"type(class_label): {type(class_label)} class_label: {class_label}")
     mask = pcd.point["label"] == class_label
+    logger.warning(f"type(mask): {type(mask)}")
+    logger.warning(f"mask.shape: {mask.shape}")
+    
     pcd_labels = pcd.select_by_index(mask.nonzero()[0])
+    logger.warning(f"pcd_labels['positions'].shape: {pcd_labels.point['positions'].shape}")
     return pcd_labels
 
 def get_class_plane(pcd, class_label):
@@ -87,11 +97,11 @@ def align_normal_to_y_axis(normal_):
 
 def compute_tilt_matrix(pcd):
     '''
-    Compute the tilt of the point cloud
+    Compute navigation-space tilt w.r.t y-axis
     '''
-    normal, _ = get_class_plane(pcd, 2)
+    normal, _ = get_class_plane(pcd, LABELS["NAVIGABLE_SPACE"]["id"])
     R = align_normal_to_y_axis(normal)
-    
+
     return R
 
 def filter_radius_outliers(pcd, nb_points, search_radius):
@@ -151,24 +161,28 @@ if __name__ == "__main__":
     R = compute_tilt_matrix(pcd_input)
     
     # sanity check
-    normal, _ = get_class_plane(pcd_input, 2)
+    # normal, _ = get_class_plane(pcd_input, 2)
+    normal, _ = get_class_plane(pcd_input, LABELS["NAVIGABLE_SPACE"]["id"])
     normal_ = np.dot(normal, R.T)
     angles = axis_angles(normal_)
+    logger.info(f"=================================")    
     logger.info(f"axis_angles: {angles}")
     logger.info(f"Ground plane makes {angles} degrees with y-axis!")
+    logger.info(f"=================================\n")
 
     # angle between normal and y-axis should be close to 0 degrees
     if not np.isclose(angles[1], 0, atol=1):
+        logger.error(f"=================================")    
         logger.error(f"Error: angles_transformed[1] is {angles[1]}, but it should be close to 0 degrees. Please check the tilt correction!")
+        logger.error(f"=================================\n")
         exit(1)
 
-    exit(1)
     pcd_corrected = pcd_input.clone()
     pcd_corrected.rotate(R, center=(0, 0, 0))
 
 
     # FILTERING UNWANTED LABELS => [VEGETATION, TRACTOR-HOOD, VOID, SKY]
-    valid_labels = np.array(list(LABELS.values()))
+    valid_labels = np.array([label["id"] for label in LABELS.values()])
     valid_mask = np.isin(pcd_corrected.point['label'].numpy(), valid_labels)
     
     pcd_filtered = pcd_corrected.select_by_mask(valid_mask.flatten())
@@ -181,7 +195,7 @@ if __name__ == "__main__":
     logger.info(f"=================================")    
     logger.info(f"Before filtering: {original_points}")
     logger.info(f"After filtering: {filtered_points}")
-    logger.info(f"Reduction percentage: {reduction_percentage:.2f}%")
+    logger.info(f"Reduction %: {reduction_percentage:.2f}%")
     logger.info(f"Unique labels in pcd_filtered: {unique_labels}")
     logger.info(f"=================================\n")
     
@@ -191,7 +205,7 @@ if __name__ == "__main__":
     pcd_stem = get_class_pointcloud(pcd_filtered, LABELS["VINE_STEM"]["id"])
     pcd_obstacle = get_class_pointcloud(pcd_filtered, LABELS["OBSTACLE"]["id"])
     pcd_navigable = get_class_pointcloud(pcd_filtered, LABELS["NAVIGABLE_SPACE"]["id"])
-
+    
     # num-points for each class
     total_points = len(pcd_filtered.point['positions'])
     canopy_points = len(pcd_canopy.point['positions'])
