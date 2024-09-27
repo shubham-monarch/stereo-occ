@@ -139,7 +139,7 @@ LABELS = {
 
 if __name__ == "__main__":
     
-    src_folder = "ply/segmented-1056_to_1198/"
+    src_folder = "../ply/segmented-1056_to_1198/"
     # random_pointcloud_path = get_random_segmented_pcd(src_folder)
     src_path = os.path.join(src_folder, "1.ply")
     pcd = o3d.t.io.read_point_cloud(src_path)
@@ -164,84 +164,29 @@ if __name__ == "__main__":
     pcd_.rotate(R, center=(0, 0, 0))
 
     PCD = pcd_.clone()
-    pcd_canopy = get_class_pointcloud(PCD, LABELS["VINE_CANOPY"])
-    pcd_pole = get_class_pointcloud(PCD, LABELS["VINE_POLE"])
-    pcd_stem = get_class_pointcloud(PCD, LABELS["VINE_STEM"])
-
-    logger.info(f"type(pcd_canopy.point): {type(pcd_canopy.point)}")
     
-    # updating primary key
-    logger.info(f"primary_key: {pcd_canopy.point.primary_key}")
-    pcd_canopy.point.primary_key = "colors"
-    logger.info(f"primary_key: {pcd_canopy.point.primary_key}")
+    # Generate the x, y, z max and min and range for PCD
+    # np_positions = np.array(PCD.point['positions'])
+    pcd_tensor_map  = PCD.point 
+    logger.info(f"type(pcd_tensor_map): {type(pcd_tensor_map)}")
     
-    logger.info(f"pcd_canopy.point['positions'].shape: {pcd_canopy.point['positions'].shape} "
-                f"type: {type(pcd_canopy.point['positions'])} "
-                f"type: {pcd_canopy.point['positions'].dtype}")
-    logger.info(f"pcd_canopy.point['colors'].shape: {pcd_canopy.point['colors'].shape} "
-                f"type: {pcd_canopy.point['colors'].dtype} " 
-                f"type: {pcd_canopy.point['colors'].dtype}") 
-    logger.info(f"pcd_canopy.point['label'].shape: {pcd_canopy.point['label'].shape} "
-                f"type: {pcd_canopy.point['label'].dtype} "
-                f"type: {pcd_canopy.point['label'].dtype}")
+    for key,tensor in pcd_tensor_map.items():
+        logger.info(f"key: {key}")
+        logger.info(f"shape: {tensor.shape}")
 
+    logger.warning(f"Primary key: {pcd_tensor_map.primary_key}")
 
-    # DS_VINE_CANOPY = PCD_VINE_CANOPY.voxel_down_sample(voxel_size=0.1)
-    # DS_VINE_POLE = PCD_VINE_POLE.voxel_down_sample(voxel_size=0.1)
-    # DOWNSAMPLED_VINE_STEM = PCD_VINE_STEM.voxel_down_sample(voxel_size=0.1)
-
-    # logger.info(f"num_points(DOWNSAMPLED_VINE_CANOPY): {DS_VINE_CANOPY.point.positions.shape}")
-
-    # logger.info(f"type(DS_VINE_CANOPY): {type(DS_VINE_CANOPY)}")
-    # logger.info(f"type(DS_VINE_CANOPY.points.positions): {type(DS_VINE_CANOPY.point.positions)}")
-    # # visualize
-
-    # new_tensor = o3d.core.append(DS_VINE_CANOPY.point.positions, 
-    #                              o3d.core.Tensor(np.random.rand(3), dtype=o3d.core.Dtype.Float32))
-
-
-    # VOXELS_CANOPY = o3d.geometry.VoxelGrid.create_from_point_cloud(
-    #     PCD_VINE_CANOPY.to_legacy(), 
-    #     voxel_size=0.1
-    # )
-
-    # VOXELS_POLE = o3d.geometry.VoxelGrid.create_from_point_cloud(
-    #     PCD_VINE_POLE.to_legacy(), 
-    #     voxel_size=0.1
-    # )
-
-    # VOXELS_STEM = o3d.geometry.VoxelGrid.create_from_point_cloud(
-    #     PCD_VINE_STEM.to_legacy(), 
-    #     voxel_size=0.1
-    # )
-
-    # from open3d.ml.torch.layers import VoxelPooling
-
-    # # Merge VOXELS_CANOPY and VOXELS_POLE using VoxelPooling
-    # merged_voxels = VoxelPooling(voxel_size=0.1, point_cloud_range=[-10, -10, -10, 10, 10, 10], max_num_points=5)
-    # merged_voxels.add_voxels(VOXELS_CANOPY)
-    # merged_voxels.add_voxels(VOXELS_POLE)
-    # merged_voxels.pool()
-
-    # VOXELS_POLE_SHIFTED = o3d.geometry.VoxelGrid(VOXELS_POLE)
-    # VOXELS_POLE_SHIFTED.origin = VOXELS_POLE.origin + np.array([0, 10, 0])
-
-
-    # # VOXELS_COMBINED = combine_voxel_grids(VOXELS_CANOPY, VOXELS_POLE)
-    # T_origin = VOXELS_POLE.origin - VOXELS_CANOPY.origin
+    tensor_map_dict = dict(pcd_tensor_map.items())
     
-    # for voxel in tqdm(VOXELS_POLE.get_voxels(), desc="Processing voxels"):
-    #     voxel_idx_pole = voxel.grid_index
-    #     point_pole = VOXELS_POLE.get_voxel_center_coordinate(voxel_idx_pole)
-    #     point_pole = point_pole - VOXELS_CANOPY.origin
-        
-    #     # point_canopy = point_pole - T_origin
-    #     voxel_idx_canopy = VOXELS_CANOPY.get_voxel(point_pole)
-
-    #     voxel_canopy = o3d.geometry.Voxel(grid_index=voxel_idx_canopy)
-    #     VOXELS_CANOPY.remove_voxel(voxel_idx_canopy)
-    #     VOXELS_CANOPY.add_voxel(voxel_canopy)
-
+    pcd_tensor_map_color = o3d.t.geometry.TensorMap(
+        "colors",
+        dict(pcd_tensor_map.items()))
+    
+    
+    
+    logger.warning(f"Primary key: {pcd_tensor_map_color.primary_key}")
+    
+    
         
 
     # visualization wind

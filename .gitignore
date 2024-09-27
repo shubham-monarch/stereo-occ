@@ -20,6 +20,7 @@ svo-test/*
 output-backend/*
 input-backend/*
 logs/*
+build/*
 
 # file types
 *.bin
