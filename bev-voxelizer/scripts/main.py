@@ -15,9 +15,13 @@ from utils import io_utils
 
 # TO-DO
 # - priority based collapsing
+# - crop pointcloud to bounding box
+# - hidden point removal 
 # - removal of below-ground points
 # - testing over 50 pointclouds
 # - custom voxel downsampling
+# - farthest point sampling
+# - statistical outlier removal
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='INFO', logger=logger, force=True)
@@ -66,6 +70,9 @@ def get_class_plane(pcd, class_label):
     return normal, inliers
 
 def align_normal_to_y_axis(normal_):
+    '''
+    Rotation matrix to align the normal vector to the y-axis
+    '''
     y_axis = np.array([0, 1, 0])
     v = np.cross(normal_, y_axis)
     s = np.linalg.norm(v)
@@ -88,47 +95,20 @@ def compute_tilt_matrix(pcd):
     logger.info(f"Ground plane makes {angles_transformed[0]} degrees with axes!")
     return R
 
-def remove_points_by_labels(pcd, labels: np.array):
-    pcd_ = pcd.clone()
+def filter_radius_outliers(pcd, nb_points, search_radius):
+    '''
+    Filter radius-based outliers from the point cloud
+    '''
+    _, ind = pcd.remove_radius_outliers(nb_points=nb_points, search_radius=search_radius)
+    inliers = pcd.select_by_mask(ind)
+    outliers = pcd.select_by_mask(ind, invert=True)
+    return inliers, outliers
 
-    pcd_labels = pcd_.point["label"].numpy()
-    pcd_positions = pcd_.point["positions"].numpy()
-    pcd_colors = pcd_.point["colors"].numpy()
-    
-    mask = np.isin(pcd_labels, labels, invert=True)
-
-    pcd_positions = pcd_positions[mask.flatten()]
-    pcd_colors = pcd_colors[mask.flatten()]
-    pcd_labels = pcd_labels[mask.flatten()]
-
-    pcd_.point["positions"] = o3d.core.Tensor(pcd_positions, dtype=o3d.core.Dtype.Float32)
-    pcd_.point["colors"] = o3d.core.Tensor(pcd_colors, dtype=o3d.core.Dtype.Float32)
-    pcd_.point["label"] = o3d.core.Tensor(pcd_labels, dtype=o3d.core.Dtype.Int32)
-    
-    
-    logger.warning(f"len(pcd_.point.positions): {len(pcd_.point.positions)}")
-    logger.warning(f"len(pcd.point.positions): {len(pcd.point.positions)}")
-    return pcd_
-
-
-def extract_voxel_centers(voxel_grid):
-    return np.array([voxel.grid_index for voxel in voxel_grid.get_voxels()])
-
-def combine_voxel_grids(voxel_grid1, voxel_grid2):
-    voxel_centers1 = extract_voxel_centers(voxel_grid1)
-    voxel_centers2 = extract_voxel_centers(voxel_grid2)
-    
-    combined_voxel_centers = np.vstack((voxel_centers1, voxel_centers2))
-    
-    combined_pcd = o3d.geometry.PointCloud()
-    combined_pcd.points = o3d.utility.Vector3dVector(combined_voxel_centers)
-    
-    combined_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud(
-        combined_pcd, 
-        voxel_size=voxel_grid1.voxel_size
-    )
-    
-    return combined_voxel_grid
+def collapse_along_y_axis(pcd):
+    positions = pcd.point['positions'].numpy()
+    positions[:, 1] = 0  # Set y-coordinate to 0
+    pcd.point['positions'] = o3c.Tensor(positions)
+    return pcd
 
 def display_inlier_outlier(cloud : o3d.t.geometry.PointCloud, mask : o3c.Tensor):
     inlier_cloud = cloud.select_by_mask(mask)
@@ -174,9 +154,8 @@ if __name__ == "__main__":
     pcd_corrected = pcd_input.clone()
     pcd_corrected.rotate(R, center=(0, 0, 0))
 
-    # GLOBAL POINTCLOUD FILTERING
 
-    # removing unwanted labels => [vegetation, tractor-hood, void, sky]
+    # FILTERING UNWANTED LABELS => [VEGETATION, TRACTOR-HOOD, VOID, SKY]
     valid_labels = np.array(list(LABELS.values()))
     valid_mask = np.isin(pcd_corrected.point['label'].numpy(), valid_labels)
     
@@ -218,11 +197,11 @@ if __name__ == "__main__":
 
     logger.info(f"=================================")    
     logger.info(f"Total points: {total_points}")
-    logger.info(f"Canopy points: {canopy_points} ({canopy_percentage:.2f}%)")
-    logger.info(f"Pole points: {pole_points} ({pole_percentage:.2f}%)")
-    logger.info(f"Stem points: {stem_points} ({stem_percentage:.2f}%)")
-    logger.info(f"Obstacle points: {obstacle_points} ({obstacle_percentage:.2f}%)")
-    logger.info(f"Navigable points: {navigable_points} ({navigable_percentage:.2f}%)")
+    logger.info(f"Canopy points: {canopy_points} [{canopy_percentage:.2f}%]")
+    logger.info(f"Pole points: {pole_points} [{pole_percentage:.2f}%]")
+    logger.info(f"Stem points: {stem_points} [{stem_percentage:.2f}%]")
+    logger.info(f"Obstacle points: {obstacle_points} [{obstacle_percentage:.2f}%]")
+    logger.info(f"Navigable points: {navigable_points} [{navigable_percentage:.2f}%]")
     logger.info(f"=================================\n")
 
     # DOWNSAMPLING LABEL-WISE POINTCLOUD
@@ -247,13 +226,32 @@ if __name__ == "__main__":
     down_navigable_percentage = (down_navigable_points / down_total_points) * 100
     
     logger.info(f"=================================")    
+    logger.info(f"[AFTER DOWNSAMPLING]")
     logger.info(f"Downsampled Total points: {down_total_points}")
-    logger.info(f"Downsampled Canopy points: {down_canopy_points} => ({down_canopy_percentage:.2f}%)")
-    logger.info(f"Downsampled Pole points: {down_pole_points} => ({down_pole_percentage:.2f}%)")
-    logger.info(f"Downsampled Stem points: {down_stem_points} => ({down_stem_percentage:.2f}%)")
-    logger.info(f"Downsampled Obstacle points: {down_obstacle_points} => ({down_obstacle_percentage:.2f}%)")
-    logger.info(f"Downsampled Navigable points: {down_navigable_points} => ({down_navigable_percentage:.2f}%)")
+    logger.info(f"Downsampled Canopy points: {down_canopy_points} [{down_canopy_percentage:.2f}%]")
+    logger.info(f"Downsampled Pole points: {down_pole_points} [{down_pole_percentage:.2f}%]")
+    logger.info(f"Downsampled Stem points: {down_stem_points} [{down_stem_percentage:.2f}%]")
+    logger.info(f"Downsampled Obstacle points: {down_obstacle_points} [{down_obstacle_percentage:.2f}%]")
+    logger.info(f"Downsampled Navigable points: {down_navigable_points} [{down_navigable_percentage:.2f}%]")
     logger.info(f"=================================\n")
+    
+    # radius-based outlier removal
+    down_canopy, _ = down_canopy.remove_radius_outliers(nb_points=16, search_radius=0.05)
+    down_pole, _ = down_pole.remove_radius_outliers(nb_points=16, search_radius=0.05)
+    down_stem, _ = down_stem.remove_radius_outliers(nb_points=16, search_radius=0.05)
+    down_obstacle, _ = down_obstacle.remove_radius_outliers(nb_points=16, search_radius=0.05)
+    down_navigable, _ = down_navigable.remove_radius_outliers(nb_points=16, search_radius=0.05)
+    
+    logger.info(f"=================================")    
+    logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
+    logger.info(f"Canopy points reduction: [{100 - (down_canopy_points - len(down_canopy.point['positions'])) / down_canopy_points * 100:.2f}%]")
+    logger.info(f"Pole points reduction: [{100 - (down_pole_points - len(down_pole.point['positions'])) / down_pole_points * 100:.2f}%]")
+    logger.info(f"Stem points reduction: [{100 - (down_stem_points - len(down_stem.point['positions'])) / down_stem_points * 100:.2f}%]")
+    logger.info(f"Obstacle points reduction: [{100 - (down_obstacle_points - len(down_obstacle.point['positions'])) / down_obstacle_points * 100:.2f}%]")
+    logger.info(f"Navigable points reduction: [{100 - (down_navigable_points - len(down_navigable.point['positions'])) / down_navigable_points * 100:.2f}%]")
+    logger.info(f"=================================\n")
+
+    
     
     # # Compute the number of points with the same (x,z) value in down_stem and down_pole
     # down_pcd_positions = down_pcd.point['positions'].numpy()
