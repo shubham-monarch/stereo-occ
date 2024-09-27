@@ -105,8 +105,12 @@ def filter_radius_outliers(pcd, nb_points, search_radius):
     Filter radius-based outliers from the point cloud
     '''
     _, ind = pcd.remove_radius_outliers(nb_points=nb_points, search_radius=search_radius)
+    logger.error(f"type(ind): {type(ind)} ind.shape: {ind.shape}")
     inliers = pcd.select_by_mask(ind)
     outliers = pcd.select_by_mask(ind, invert=True)
+    logger.error(f"FILTER_RADIUS_OUTLIERS =>")
+    logger.error(f"type(inliers): {type(inliers)}")
+    logger.error(f"type(outliers): {type(outliers)}")
     return inliers, outliers
 
 def collapse_along_y_axis(pcd):
@@ -114,18 +118,6 @@ def collapse_along_y_axis(pcd):
     return pcd
 
 
-def display_inlier_outlier(cloud : o3d.t.geometry.PointCloud, mask : o3c.Tensor):
-    inlier_cloud = cloud.select_by_mask(mask)
-    outlier_cloud = cloud.select_by_mask(mask, invert=True)
-
-    print("Showing outliers (red) and inliers (gray): ")
-    outlier_cloud = outlier_cloud.paint_uniform_color([1.0, 0, 0])
-    inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])
-    inlier_cloud = o3d.visualization.draw_geometries([inlier_cloud.to_legacy(), outlier_cloud.to_legacy()],
-                                      zoom=0.3412,
-                                      front=[0.4257, -0.2125, -0.8795],
-                                      lookat=[2.6172, 2.0475, 1.532],
-                                      up=[-0.0694, -0.9768, 0.2024])
 LABEL_COLOR_MAP = { 
     0: [0, 0, 0],        # black
     1: [246, 4, 228],    # purple
@@ -152,7 +144,7 @@ if __name__ == "__main__":
     src_path = os.path.join(src_folder, "1.ply")
     pcd_input = o3d.t.io.read_point_cloud(src_path)
 
-    logger.warning(f"type(pcd_input.point['positions']): {type(pcd_input.point['positions'])}") 
+    # logger.warning(f"type(pcd_input.point['positions']): {type(pcd_input.point['positions'])}") 
     
     # pcd correction
     R = compute_tilt_matrix(pcd_input)
@@ -175,12 +167,12 @@ if __name__ == "__main__":
         exit(1)
 
 
-    logger.warning(f"type(pcd_input.point['positions']): {type(pcd_input.point['positions'])}")
+    # logger.warning(f"type(pcd_input.point['positions']): {type(pcd_input.point['positions'])}")
 
     pcd_corrected = pcd_input.clone()
     pcd_corrected.rotate(R, center=(0, 0, 0))
 
-    logger.warning(f"type(pcd_corrected.point['positions']): {type(pcd_corrected.point['positions'])}")
+    # logger.warning(f"type(pcd_corrected.point['positions']): {type(pcd_corrected.point['positions'])}")
 
     # FILTERING UNWANTED LABELS => [VEGETATION, TRACTOR-HOOD, VOID, SKY]
     valid_labels = np.array([label["id"] for label in LABELS.values()])
@@ -191,7 +183,7 @@ if __name__ == "__main__":
     filtered_points = len(pcd_filtered.point['positions'])
     reduction_percentage = ((original_points - filtered_points) / original_points) * 100
 
-    logger.warning(f"type(pcd_filtered.point['positions']: {type(pcd_filtered.point['positions'])}")
+    # logger.warning(f"type(pcd_filtered.point['positions']: {type(pcd_filtered.point['positions'])}")
     
     unique_labels = np.unique(pcd_filtered.point['label'].numpy())
     
@@ -243,7 +235,7 @@ if __name__ == "__main__":
     down_obstacle = pcd_obstacle.voxel_down_sample(voxel_size=0.1)
     down_navigable = pcd_navigable.voxel_down_sample(voxel_size=0.1)
 
-    logger.warning(f"type(down_pcd.point['positions']): {type(down_pcd.point['positions'])}")
+    # logger.warning(f"type(down_pcd.point['positions']): {type(down_pcd.point['positions'])}")
 
     down_total_points = len(down_pcd.point['positions'].numpy())
     down_canopy_points = len(down_canopy.point['positions'])
@@ -269,19 +261,18 @@ if __name__ == "__main__":
     logger.info(f"=================================\n")
     
     # radius-based outlier removal
-    filtered_canopy, _ = down_canopy.remove_radius_outliers(nb_points=16, search_radius=0.05)
-    filtered_pole, outliers_pole = down_pole.remove_radius_outliers(nb_points=16, search_radius=0.05)
-    filtered_stem, _ = down_stem.remove_radius_outliers(nb_points=16, search_radius=0.05)
-    filtered_obstacle, _ = down_obstacle.remove_radius_outliers(nb_points=16, search_radius=0.05)
-    filtered_navigable, _ = down_navigable.remove_radius_outliers(nb_points=16, search_radius=0.05)
+    filtered_canopy, _ = filter_radius_outliers(down_canopy, nb_points=16, search_radius=0.05)
+    filtered_pole, outliers_pole = filter_radius_outliers(down_pole, nb_points=16, search_radius=0.05)
+    filtered_stem, _ = filter_radius_outliers(down_stem, nb_points=16, search_radius=0.05)
+    filtered_obstacle, _ = filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)
+    filtered_navigable, _ = filter_radius_outliers(down_navigable, nb_points=16, search_radius=0.05)
 
+    logger.error(f"type(filtered_pole): {type(filtered_pole)}") 
     logger.warning(f"type(filtered_pole): {type(filtered_pole)}") 
-
-    # Paint filtered_pole with yellow and outliers_pole with red
-    filtered_pole = filtered_pole.paint_uniform_color([1.0, 1.0, 0.0])  # Yellow
-    outliers_pole = outliers_pole.paint_uniform_color([1.0, 0.0, 0.0])  # Red
-
-        
+    logger.warning(f"type(outliers_pole): {type(outliers_pole)}")
+    # filtered_pole.paint_uniform_color([1.0, 1.0, 0.0])  # Yellow
+    # outliers_pole.paint_uniform_color([1.0, 0.0, 0.0])  # Red
+    
     # logger.info(f"=================================")    
     # logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
     # logger.info(f"Canopy points: {len(filtered_canopy.point['positions'])} [-{100 - (down_canopy_points - len(filtered_canopy.point['positions'])) / down_canopy_points * 100:.2f}%]")
@@ -360,8 +351,8 @@ if __name__ == "__main__":
 
     # adding point clouds to visualizer
     # vis.add_geometry(pcd_filtered.to_legacy())
-    vis.add_geometry(filtered_pole.to_legacy())
-    vis.add_geometry(outliers_pole.to_legacy())
+    # vis.add_geometry(filtered_pole.to_legacy())
+    # vis.add_geometry(outliers_pole.to_legacy())
     # vis.add_geometry(collapsed_pole.to_legacy())
     # vis.add_geometry(down_pole.to_legacy())
     # vis.add_geometry(down_stem.to_legacy())
