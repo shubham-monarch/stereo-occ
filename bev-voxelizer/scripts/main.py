@@ -60,13 +60,8 @@ def get_class_pointcloud(pcd, class_label):
     '''
     Returns class-specific point cloud
     '''
-    logger.warning(f"type(class_label): {type(class_label)} class_label: {class_label}")
     mask = pcd.point["label"] == class_label
-    logger.warning(f"type(mask): {type(mask)}")
-    logger.warning(f"mask.shape: {mask.shape}")
-    
     pcd_labels = pcd.select_by_index(mask.nonzero()[0])
-    logger.warning(f"pcd_labels['positions'].shape: {pcd_labels.point['positions'].shape}")
     return pcd_labels
 
 def get_class_plane(pcd, class_label):
@@ -270,9 +265,9 @@ if __name__ == "__main__":
     
     logger.info(f"=================================")    
     logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
-    logger.info(f"% Canopy points reduction: [{100 - (down_canopy_points - len(down_canopy.point['positions'])) / down_canopy_points * 100:.2f}%]")
-    logger.info(f"% Pole points reduction: [{100 - (down_pole_points - len(down_pole.point['positions'])) / down_pole_points * 100:.2f}%]")
-    logger.info(f"% Stem points reduction: [{100 - (down_stem_points - len(down_stem.point['positions'])) / down_stem_points * 100:.2f}%]")
+    logger.info(f"Canopy points reduction %: [{100 - (down_canopy_points - len(down_canopy.point['positions'])) / down_canopy_points * 100:.2f}%]")
+    logger.info(f"Pole points reduction %: [{100 - (down_pole_points - len(down_pole.point['positions'])) / down_pole_points * 100:.2f}%]")
+    logger.info(f"Stem points reduction %: [{100 - (down_stem_points - len(down_stem.point['positions'])) / down_stem_points * 100:.2f}%]")
     logger.info(f"% Obstacle points reduction: [{100 - (down_obstacle_points - len(down_obstacle.point['positions'])) / down_obstacle_points * 100:.2f}%]")
     logger.info(f"% Navigable points reduction: [{100 - (down_navigable_points - len(down_navigable.point['positions'])) / down_navigable_points * 100:.2f}%]")
     logger.info(f"=================================\n")
