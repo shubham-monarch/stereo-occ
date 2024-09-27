@@ -105,12 +105,8 @@ def filter_radius_outliers(pcd, nb_points, search_radius):
     Filter radius-based outliers from the point cloud
     '''
     _, ind = pcd.remove_radius_outliers(nb_points=nb_points, search_radius=search_radius)
-    logger.error(f"type(ind): {type(ind)} ind.shape: {ind.shape}")
     inliers = pcd.select_by_mask(ind)
     outliers = pcd.select_by_mask(ind, invert=True)
-    logger.error(f"FILTER_RADIUS_OUTLIERS =>")
-    logger.error(f"type(inliers): {type(inliers)}")
-    logger.error(f"type(outliers): {type(outliers)}")
     return inliers, outliers
 
 def collapse_along_y_axis(pcd):
@@ -201,8 +197,6 @@ if __name__ == "__main__":
     pcd_obstacle = get_class_pointcloud(pcd_filtered, LABELS["OBSTACLE"]["id"])
     pcd_navigable = get_class_pointcloud(pcd_filtered, LABELS["NAVIGABLE_SPACE"]["id"])
     
-    logger.warning(f"type(pcd_canopy.point['positions']): {type(pcd_canopy.point['positions'])}")
-
     # num-points for each class
     total_points = len(pcd_filtered.point['positions'])
     canopy_points = len(pcd_canopy.point['positions'])
@@ -267,22 +261,16 @@ if __name__ == "__main__":
     filtered_obstacle, _ = filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)
     filtered_navigable, _ = filter_radius_outliers(down_navigable, nb_points=16, search_radius=0.05)
 
-    logger.error(f"type(filtered_pole): {type(filtered_pole)}") 
-    logger.warning(f"type(filtered_pole): {type(filtered_pole)}") 
-    logger.warning(f"type(outliers_pole): {type(outliers_pole)}")
-    # filtered_pole.paint_uniform_color([1.0, 1.0, 0.0])  # Yellow
-    # outliers_pole.paint_uniform_color([1.0, 0.0, 0.0])  # Red
     
-    # logger.info(f"=================================")    
-    # logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
-    # logger.info(f"Canopy points: {len(filtered_canopy.point['positions'])} [-{100 - (down_canopy_points - len(filtered_canopy.point['positions'])) / down_canopy_points * 100:.2f}%]")
-    # logger.info(f"Pole points: {len(filtered_pole.point['positions'])} [-{100 - (down_pole_points - len(filtered_pole.point['positions'])) / down_pole_points * 100:.2f}%]")
-    # logger.info(f"Stem points: {len(filtered_stem.point['positions'])} [-{100 - (down_stem_points - len(filtered_stem.point['positions'])) / down_stem_points * 100:.2f}%]")
-    # logger.info(f"Obstacle points: {len(filtered_obstacle.point['positions'])} [-{100 - (down_obstacle_points - len(filtered_obstacle.point['positions'])) / down_obstacle_points * 100:.2f}%]")
-    # logger.info(f"Navigable points: {len(filtered_navigable.point['positions'])} [-{100 - (down_navigable_points - len(filtered_navigable.point['positions'])) / down_navigable_points * 100:.2f}%]")
-    # logger.info(f"=================================\n")
+    logger.info(f"=================================")    
+    logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
+    logger.info(f"Canopy points: {len(filtered_canopy.point['positions'])} [-{100 - (down_canopy_points - len(filtered_canopy.point['positions'])) / down_canopy_points * 100:.2f}%]")
+    logger.info(f"Pole points: {len(filtered_pole.point['positions'])} [-{100 - (down_pole_points - len(filtered_pole.point['positions'])) / down_pole_points * 100:.2f}%]")
+    logger.info(f"Stem points: {len(filtered_stem.point['positions'])} [-{100 - (down_stem_points - len(filtered_stem.point['positions'])) / down_stem_points * 100:.2f}%]")
+    logger.info(f"Obstacle points: {len(filtered_obstacle.point['positions'])} [-{100 - (down_obstacle_points - len(filtered_obstacle.point['positions'])) / down_obstacle_points * 100:.2f}%]")
+    logger.info(f"Navigable points: {len(filtered_navigable.point['positions'])} [-{100 - (down_navigable_points - len(filtered_navigable.point['positions'])) / down_navigable_points * 100:.2f}%]")
+    logger.info(f"=================================\n")
 
-    
     
     # bev_pole = collapse_along_y_axis(down_pole)
     # bev_stem = collapse_along_y_axis(down_stem)
