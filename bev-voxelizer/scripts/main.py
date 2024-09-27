@@ -142,6 +142,17 @@ def display_inlier_outlier(cloud : o3d.t.geometry.PointCloud, mask : o3c.Tensor)
                                       front=[0.4257, -0.2125, -0.8795],
                                       lookat=[2.6172, 2.0475, 1.532],
                                       up=[-0.0694, -0.9768, 0.2024])
+LABEL_COLOR_MAP = { 
+    0: [0, 0, 0],        # black
+    1: [246, 4, 228],    # purple
+    2: [173, 94, 48],    # blue
+    3: [68, 171, 117],   # brown
+    4: [162, 122, 174],  # gray
+    5: [121, 119, 148],  # pink
+    6: [253, 75, 40],    # orange
+    7: [170, 60, 100],   # dark pink
+    8: [60, 100, 179]    # green
+}
 
 LABELS = {    
     "VINE_POLE": 5,  
@@ -154,26 +165,23 @@ LABELS = {
 if __name__ == "__main__":
     
     src_folder = "../ply/segmented-1056_to_1198/"
-    # random_pointcloud_path = get_random_segmented_pcd(src_folder)
     src_path = os.path.join(src_folder, "1.ply")
     pcd_input = o3d.t.io.read_point_cloud(src_path)
     
     # pcd correction
     R = compute_tilt_matrix(pcd_input)
-    pcd_ = pcd_input.clone()
-    pcd_.rotate(R, center=(0, 0, 0))
+    
+    pcd_corrected = pcd_input.clone()
+    pcd_corrected.rotate(R, center=(0, 0, 0))
 
     # GLOBAL POINTCLOUD FILTERING
 
     # removing unwanted labels => [vegetation, tractor-hood, void, sky]
     valid_labels = np.array(list(LABELS.values()))
-    valid_mask = np.isin(pcd_.point['label'].numpy(), valid_labels)
+    valid_mask = np.isin(pcd_corrected.point['label'].numpy(), valid_labels)
     
-    logger.info(f"type(valid_mask): {type(valid_mask)}")
-    logger.info(f"valid_mask.shape: {valid_mask.shape}")
-    
-    pcd_filtered = pcd_.select_by_mask(valid_mask.flatten())
-    original_points = len(pcd_.point['positions'])
+    pcd_filtered = pcd_corrected.select_by_mask(valid_mask.flatten())
+    original_points = len(pcd_corrected.point['positions'])
     filtered_points = len(pcd_filtered.point['positions'])
     reduction_percentage = ((original_points - filtered_points) / original_points) * 100
     
@@ -186,54 +194,66 @@ if __name__ == "__main__":
     logger.info(f"Unique labels in pcd_filtered: {unique_labels}")
     logger.info(f"=================================\n")
     
-    # verify the pointcloud labels
-    
-    
-    exit(1)
-
     # class-wise point cloud extraction
-    pcd_canopy = get_class_pointcloud(pcd_, LABELS["VINE_CANOPY"])
-    pcd_pole = get_class_pointcloud(pcd_, LABELS["VINE_POLE"])
-    pcd_stem = get_class_pointcloud(pcd_, LABELS["VINE_STEM"])
+    pcd_canopy = get_class_pointcloud(pcd_filtered, LABELS["VINE_CANOPY"])
+    pcd_pole = get_class_pointcloud(pcd_filtered, LABELS["VINE_POLE"])
+    pcd_stem = get_class_pointcloud(pcd_filtered, LABELS["VINE_STEM"])
+    pcd_obstacle = get_class_pointcloud(pcd_filtered, LABELS["OBSTACLE"])
+    pcd_navigable = get_class_pointcloud(pcd_filtered, LABELS["NAVIGABLE_SPACE"])
 
-    total_points = len(pcd_.point['positions'])
+    # num-points for each class
+    total_points = len(pcd_filtered.point['positions'])
     canopy_points = len(pcd_canopy.point['positions'])
     pole_points = len(pcd_pole.point['positions'])
     stem_points = len(pcd_stem.point['positions'])
-    
+    obstacle_points = len(pcd_obstacle.point['positions'])
+    navigable_points = len(pcd_navigable.point['positions'])
+
+    # % points for each class
     canopy_percentage = (canopy_points / total_points) * 100
     pole_percentage = (pole_points / total_points) * 100
     stem_percentage = (stem_points / total_points) * 100
+    obstacle_percentage = (obstacle_points / total_points) * 100
+    navigable_percentage = (navigable_points / total_points) * 100
 
     logger.info(f"=================================")    
     logger.info(f"Total points: {total_points}")
     logger.info(f"Canopy points: {canopy_points} ({canopy_percentage:.2f}%)")
     logger.info(f"Pole points: {pole_points} ({pole_percentage:.2f}%)")
     logger.info(f"Stem points: {stem_points} ({stem_percentage:.2f}%)")
+    logger.info(f"Obstacle points: {obstacle_points} ({obstacle_percentage:.2f}%)")
+    logger.info(f"Navigable points: {navigable_points} ({navigable_percentage:.2f}%)")
     logger.info(f"=================================\n")
 
-    # downsampling individual point clouds
-    down_pcd = pcd_.voxel_down_sample(voxel_size=0.1)
+    # DOWNSAMPLING LABEL-WISE POINTCLOUD
+    down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.1)
     down_canopy = pcd_canopy.voxel_down_sample(voxel_size=0.1)
     down_pole = pcd_pole.voxel_down_sample(voxel_size=0.01)
     down_stem = pcd_stem.voxel_down_sample(voxel_size=0.1)
+    down_obstacle = pcd_obstacle.voxel_down_sample(voxel_size=0.1)
+    down_navigable = pcd_navigable.voxel_down_sample(voxel_size=0.1)
 
     down_total_points = len(down_pcd.point['positions'])
     down_canopy_points = len(down_canopy.point['positions'])
     down_pole_points = len(down_pole.point['positions'])
     down_stem_points = len(down_stem.point['positions'])
+    down_obstacle_points = len(down_obstacle.point['positions'])
+    down_navigable_points = len(down_navigable.point['positions'])
     
     down_canopy_percentage = (down_canopy_points / down_total_points) * 100
     down_pole_percentage = (down_pole_points / down_total_points) * 100
     down_stem_percentage = (down_stem_points / down_total_points) * 100
+    down_obstacle_percentage = (down_obstacle_points / down_total_points) * 100
+    down_navigable_percentage = (down_navigable_points / down_total_points) * 100
     
     logger.info(f"=================================")    
     logger.info(f"Downsampled Total points: {down_total_points}")
-    logger.info(f"Downsampled Canopy points: {down_canopy_points} ({down_canopy_percentage:.2f}%)")
-    logger.info(f"Downsampled Pole points: {down_pole_points} ({down_pole_percentage:.2f}%)")
-    logger.info(f"Downsampled Stem points: {down_stem_points} ({down_stem_percentage:.2f}%)")
+    logger.info(f"Downsampled Canopy points: {down_canopy_points} => ({down_canopy_percentage:.2f}%)")
+    logger.info(f"Downsampled Pole points: {down_pole_points} => ({down_pole_percentage:.2f}%)")
+    logger.info(f"Downsampled Stem points: {down_stem_points} => ({down_stem_percentage:.2f}%)")
+    logger.info(f"Downsampled Obstacle points: {down_obstacle_points} => ({down_obstacle_percentage:.2f}%)")
+    logger.info(f"Downsampled Navigable points: {down_navigable_points} => ({down_navigable_percentage:.2f}%)")
     logger.info(f"=================================\n")
-    
     
     # # Compute the number of points with the same (x,z) value in down_stem and down_pole
     # down_pcd_positions = down_pcd.point['positions'].numpy()
@@ -296,7 +316,7 @@ if __name__ == "__main__":
     vis.add_geometry(coordinate_frame)
 
     # adding point clouds to visualizer
-    vis.add_geometry(down_canopy.to_legacy())
+    vis.add_geometry(pcd_filtered.to_legacy())
     # vis.add_geometry(collapsed_pole.to_legacy())
     # vis.add_geometry(down_pole.to_legacy())
     # vis.add_geometry(down_stem.to_legacy())
