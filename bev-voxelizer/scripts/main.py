@@ -37,14 +37,17 @@ def get_random_segmented_pcd(src_foler: Path) -> Path:
     
     return random_ply_path
 
-def calculate_angles(normal_vector):
+def axis_angles(vec):
+    '''
+    Calculate the angles between input vector and the coordinate axes
+    '''
     x_axis = np.array([1, 0, 0])
     y_axis = np.array([0, 1, 0])
     z_axis = np.array([0, 0, 1])
     
-    angle_x = np.arccos(np.dot(normal_vector, x_axis) / np.linalg.norm(normal_vector))
-    angle_y = np.arccos(np.dot(normal_vector, y_axis) / np.linalg.norm(normal_vector))
-    angle_z = np.arccos(np.dot(normal_vector, z_axis) / np.linalg.norm(normal_vector))
+    angle_x = np.arccos(np.dot(vec, x_axis) / np.linalg.norm(vec))
+    angle_y = np.arccos(np.dot(vec, y_axis) / np.linalg.norm(vec))
+    angle_z = np.arccos(np.dot(vec, z_axis) / np.linalg.norm(vec))
     
     return np.degrees(angle_x), np.degrees(angle_y), np.degrees(angle_z)
 
@@ -89,10 +92,6 @@ def compute_tilt_matrix(pcd):
     normal, _ = get_class_plane(pcd, 2)
     R = align_normal_to_y_axis(normal)
     
-    # check normal
-    normal_ = np.dot(normal, R.T)
-    angles_transformed = calculate_angles(normal_)
-    logger.info(f"Ground plane makes {angles_transformed[0]} degrees with axes!")
     return R
 
 def filter_radius_outliers(pcd, nb_points, search_radius):
@@ -135,11 +134,11 @@ LABEL_COLOR_MAP = {
 }
 
 LABELS = {    
-    "VINE_POLE": 5,  
-    "VINE_CANOPY": 3,
-    "VINE_STEM": 4,  
-    "NAVIGABLE_SPACE": 2,  
-    "OBSTACLE": 1
+    "OBSTACLE": {"id": 1, "priority": 1},
+    "VINE_POLE": {"id": 5, "priority": 2},  
+    "VINE_CANOPY": {"id": 3, "priority": 3},
+    "VINE_STEM": {"id": 4, "priority": 4},  
+    "NAVIGABLE_SPACE": {"id": 2, "priority": 5},  
 }
 
 if __name__ == "__main__":
@@ -151,6 +150,19 @@ if __name__ == "__main__":
     # pcd correction
     R = compute_tilt_matrix(pcd_input)
     
+    # sanity check
+    normal, _ = get_class_plane(pcd_input, 2)
+    normal_ = np.dot(normal, R.T)
+    angles = axis_angles(normal_)
+    logger.info(f"axis_angles: {angles}")
+    logger.info(f"Ground plane makes {angles} degrees with y-axis!")
+
+    # angle between normal and y-axis should be close to 0 degrees
+    if not np.isclose(angles[1], 0, atol=1):
+        logger.error(f"Error: angles_transformed[1] is {angles[1]}, but it should be close to 0 degrees. Please check the tilt correction!")
+        exit(1)
+
+    exit(1)
     pcd_corrected = pcd_input.clone()
     pcd_corrected.rotate(R, center=(0, 0, 0))
 
@@ -174,11 +186,11 @@ if __name__ == "__main__":
     logger.info(f"=================================\n")
     
     # class-wise point cloud extraction
-    pcd_canopy = get_class_pointcloud(pcd_filtered, LABELS["VINE_CANOPY"])
-    pcd_pole = get_class_pointcloud(pcd_filtered, LABELS["VINE_POLE"])
-    pcd_stem = get_class_pointcloud(pcd_filtered, LABELS["VINE_STEM"])
-    pcd_obstacle = get_class_pointcloud(pcd_filtered, LABELS["OBSTACLE"])
-    pcd_navigable = get_class_pointcloud(pcd_filtered, LABELS["NAVIGABLE_SPACE"])
+    pcd_canopy = get_class_pointcloud(pcd_filtered, LABELS["VINE_CANOPY"]["id"])
+    pcd_pole = get_class_pointcloud(pcd_filtered, LABELS["VINE_POLE"]["id"])
+    pcd_stem = get_class_pointcloud(pcd_filtered, LABELS["VINE_STEM"]["id"])
+    pcd_obstacle = get_class_pointcloud(pcd_filtered, LABELS["OBSTACLE"]["id"])
+    pcd_navigable = get_class_pointcloud(pcd_filtered, LABELS["NAVIGABLE_SPACE"]["id"])
 
     # num-points for each class
     total_points = len(pcd_filtered.point['positions'])
@@ -244,11 +256,11 @@ if __name__ == "__main__":
     
     logger.info(f"=================================")    
     logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
-    logger.info(f"Canopy points reduction: [{100 - (down_canopy_points - len(down_canopy.point['positions'])) / down_canopy_points * 100:.2f}%]")
-    logger.info(f"Pole points reduction: [{100 - (down_pole_points - len(down_pole.point['positions'])) / down_pole_points * 100:.2f}%]")
-    logger.info(f"Stem points reduction: [{100 - (down_stem_points - len(down_stem.point['positions'])) / down_stem_points * 100:.2f}%]")
-    logger.info(f"Obstacle points reduction: [{100 - (down_obstacle_points - len(down_obstacle.point['positions'])) / down_obstacle_points * 100:.2f}%]")
-    logger.info(f"Navigable points reduction: [{100 - (down_navigable_points - len(down_navigable.point['positions'])) / down_navigable_points * 100:.2f}%]")
+    logger.info(f"% Canopy points reduction: [{100 - (down_canopy_points - len(down_canopy.point['positions'])) / down_canopy_points * 100:.2f}%]")
+    logger.info(f"% Pole points reduction: [{100 - (down_pole_points - len(down_pole.point['positions'])) / down_pole_points * 100:.2f}%]")
+    logger.info(f"% Stem points reduction: [{100 - (down_stem_points - len(down_stem.point['positions'])) / down_stem_points * 100:.2f}%]")
+    logger.info(f"% Obstacle points reduction: [{100 - (down_obstacle_points - len(down_obstacle.point['positions'])) / down_obstacle_points * 100:.2f}%]")
+    logger.info(f"% Navigable points reduction: [{100 - (down_navigable_points - len(down_navigable.point['positions'])) / down_navigable_points * 100:.2f}%]")
     logger.info(f"=================================\n")
 
     
