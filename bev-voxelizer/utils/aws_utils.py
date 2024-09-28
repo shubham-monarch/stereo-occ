@@ -113,11 +113,14 @@ def save_segmented_pcds(segmented_pcds, base_local_path):
 
 if __name__ == "__main__":
     
-    s3_uri = "s3://occupancy-dataset/occ-dataset/vineyards/treasury/"
+    s3_uri = "s3://occupancy-dataset/occ-dataset/vineyards/"
     svo_folders = list_s3_subfolders(s3_uri)
 
     logger.info(f"=================================")    
-    logger.info(svo_folders)
+    logger.info(f"Total SVO folders: {len(svo_folders)}")
+    for idx, folder in enumerate(svo_folders, start=1):
+        short_path = "/".join(folder.split('/')[-5:])
+        logger.info(f"{idx} => {short_path}")
     logger.info(f"=================================\n")
 
     folder = svo_folders
@@ -128,12 +131,11 @@ if __name__ == "__main__":
     logger.info(f"=================================")    
     logger.info(f"Total segmented PCDs: {len(segmented_pcds)}")
     for idx, pcd in enumerate(segmented_pcds, start=1):
-        sub_folders = "/".join(pcd.split('/')[-3:])
-        logger.info(f"{idx} => {sub_folders}")
+        short_path = "/".join(pcd.split('/')[-3:])
+        logger.info(f"{idx} => {short_path}")
     logger.info(f"=================================\n")
     
-    
-    base_local_path = "downloaded_segmented_pcds"
+    base_local_path = "../pcd-files/vineyards/"
     
     logger.info(f"=================================")    
     save_segmented_pcds(segmented_pcds, base_local_path)
