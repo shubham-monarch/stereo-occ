@@ -23,7 +23,10 @@ from utils import io_utils
 # - custom voxel downsampling
 # - farthest point sampling
 # - checkout bev-former voxelizer
+# - remove below-ground points
 # - statistical outlier removal
+# - refactor compute_tilt_matrix()
+# - remove non-inliers ground points
 
 # LOGGING SETUP
 logger = logging.getLogger(__name__)
@@ -66,7 +69,7 @@ def get_class_pointcloud(pcd, class_label):
     pcd_labels = pcd.select_by_index(mask.nonzero()[0])
     return pcd_labels
 
-def get_class_plane(pcd, class_label):
+def get_class_plane(pcd: o3d.t.geometry.PointCloud, class_label: int):
     '''
     Get the inliers / normal vector for the labelled pointcloud
     '''
@@ -78,6 +81,17 @@ def get_class_plane(pcd, class_label):
     normal = np.array([a, b, c])
     normal = normal / np.linalg.norm(normal) 
     return normal, inliers
+
+def get_plane_model(pcd: o3d.t.geometry.PointCloud, class_label: int):
+    '''
+    returns [a,b,c,d]
+    '''
+    pcd_class = get_class_pointcloud(pcd, class_label)
+    plane_model, inliers = pcd_class.segment_plane(distance_threshold=0.01,
+                                                    ransac_n=3,
+                                                    num_iterations=1000)
+    
+    return plane_model.numpy()
 
 def align_normal_to_y_axis(normal_):
     '''
@@ -110,23 +124,36 @@ def filter_radius_outliers(pcd, nb_points, search_radius):
     outliers = pcd.select_by_mask(ind, invert=True)
     return inliers, outliers
 
-# def collapse_along_y_axis(pcd):
-#     pcd.point['positions'][:, 1] = 0
+def collapse_along_y_axis(pcd):
+    pcd.point['positions'][:, 1] = 0
+    return pcd
+
+
+# def project_points_to_plane_model(plane_model, pcd):
+#     '''
+#     Projects all the points of the point cloud along the plane defined by the plane model (a, b, c, d)
+#     '''
+#     logger.warning(f"Inside project_points_to_plane_model()")
+#     logger.warning(f"plane_model: {plane_model}")
+
+#     a, b, c, d = plane_model
+#     points = np.asarray(pcd.point['positions'])
+    
+#     # Normalize the plane normal vector
+#     normal = np.array([a, b, c])
+#     normal = normal / np.linalg.norm(normal)
+    
+#     # Calculate the distance from each point to the plane
+#     distances = (np.dot(points, normal) + d) / np.linalg.norm(normal)
+    
+#     # Project the points onto the plane
+#     projected_points = points - np.outer(distances, normal)
+    
+#     # Update the point cloud with the projected points
+#     pcd.point['positions'] = o3d.core.Tensor(projected_points, dtype=o3c.float32)
+    
 #     return pcd
 
-def collapse_along_y_axis(pcd):
-    '''
-    Collapse the point cloud along the y-axis by setting all y-coordinates to zero.
-    '''
-    # Clone the point cloud to avoid in-place modification
-    pcd_collapsed = pcd.clone()
-    
-    # Set the y-coordinates to zero
-    positions = pcd_collapsed.point['positions']
-    positions[:, 1] = 0
-    pcd_collapsed.point['positions'] = positions
-    
-    return pcd_collapsed
 
 
 LABEL_COLOR_MAP = { 
@@ -170,8 +197,8 @@ if __name__ == "__main__":
     logger.info(f"Ground plane makes {angles} degrees with y-axis!")
     logger.info(f"=================================\n")
 
-    # angle between normal and y-axis should be close to 0 degrees
-    if not np.isclose(angles[1], 0, atol=1):
+    # angle between normal and y-axis should be close to 0 / 180 degrees
+    if not np.isclose(angles[1], 0, atol=1) and np.isclose(angles[1], 180, atol=1):
         logger.error(f"=================================")    
         logger.error(f"Error: angles_transformed[1] is {angles[1]}, but it should be close to 0 degrees. Please check the tilt correction!")
         logger.error(f"=================================\n")
@@ -185,16 +212,14 @@ if __name__ == "__main__":
 
     # logger.warning(f"type(pcd_corrected.point['positions']): {type(pcd_corrected.point['positions'])}")
 
-    # FILTERING UNWANTED LABELS => [VEGETATION, TRACTOR-HOOD, VOID, SKY]
+    # filtering unwanted labels => [vegetation, tractor-hood, void, sky]
     valid_labels = np.array([label["id"] for label in LABELS.values()])
     valid_mask = np.isin(pcd_corrected.point['label'].numpy(), valid_labels)
     
     pcd_filtered = pcd_corrected.select_by_mask(valid_mask.flatten())
     original_points = len(pcd_corrected.point['positions'])
     filtered_points = len(pcd_filtered.point['positions'])
-    reduction_percentage = ((original_points - filtered_points) / original_points) * 100
-
-    # logger.warning(f"type(pcd_filtered.point['positions']: {type(pcd_filtered.point['positions'])}")
+    reduction_percentage = ((original_points - filtered_points) / original_points) * 100    
     
     unique_labels = np.unique(pcd_filtered.point['label'].numpy())
     
@@ -237,12 +262,15 @@ if __name__ == "__main__":
     logger.info(f"=================================\n")
 
     # downsampling label-wise pointcloud
-    down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.1)
-    down_canopy = pcd_canopy.voxel_down_sample(voxel_size=0.1)
+    down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.01)
+    down_canopy = pcd_canopy.voxel_down_sample(voxel_size=0.01)
     down_pole = pcd_pole.voxel_down_sample(voxel_size=0.01)
-    down_stem = pcd_stem.voxel_down_sample(voxel_size=0.1)
-    down_obstacle = pcd_obstacle.voxel_down_sample(voxel_size=0.1)
-    down_navigable = pcd_navigable.voxel_down_sample(voxel_size=0.1)
+    down_navigable = pcd_navigable.voxel_down_sample(voxel_size=0.01)
+    # down_stem = pcd_stem.voxel_down_sample(voxel_size=0.01)
+    # down_obstacle = pcd_obstacle.voxel_down_sample(voxel_size=0.01)
+    down_obstacle = pcd_obstacle.clone()
+    down_stem = pcd_stem.clone()
+    down_pole = pcd_pole.clone()
 
     down_total_points = len(down_pcd.point['positions'].numpy())
     down_canopy_points = len(down_canopy.point['positions'])
@@ -269,108 +297,140 @@ if __name__ == "__main__":
     logger.info(f"=================================\n")
     
     # radius-based outlier removal
-    filtered_canopy, outliers_canopy = filter_radius_outliers(down_canopy, nb_points=16, search_radius=0.05)
-    filtered_pole, _ = filter_radius_outliers(down_pole, nb_points=16, search_radius=0.05)
-    filtered_stem, _ = filter_radius_outliers(down_stem, nb_points=16, search_radius=0.05)
-    filtered_obstacle, _ = filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)
-    filtered_navigable, _ = filter_radius_outliers(down_navigable, nb_points=16, search_radius=0.05)
+    # rad_filt_canopy, outliers_canopy = filter_radius_outliers(down_canopy, nb_points=1, search_radius=0.1)
+    rad_filt_pole, _ = filter_radius_outliers(down_pole, nb_points=16, search_radius=0.05)
+    rad_filt_stem, _ = filter_radius_outliers(down_stem, nb_points=16, search_radius=0.05)
+    # rad_filt_obstacle, _ = filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)
+    # rad_filt_navigable, _ = filter_radius_outliers(down_navigable, nb_points=16, search_radius=0.05)
 
-    filtered_canopy_points = len(filtered_canopy.point['positions'].numpy())
-    filtered_pole_points = len(filtered_pole.point['positions'].numpy())
-    filtered_stem_points = len(filtered_stem.point['positions'].numpy())
-    filtered_obstacle_points = len(filtered_obstacle.point['positions'].numpy())
-    filtered_navigable_points = len(filtered_navigable.point['positions'].numpy())
+    # rad_filt_canopy_points = len(rad_filt_canopy.point['positions'].numpy())
+    rad_filt_pole_points = len(rad_filt_pole.point['positions'].numpy())
+    rad_filt_stem_points = len(rad_filt_stem.point['positions'].numpy())
+    # rad_filt_obstacle_points = len(rad_filt_obstacle.point['positions'].numpy())
+    # rad_filt_navigable_points = len(rad_filt_navigable.point['positions'].numpy())
 
-    canopy_reduction_pct = (down_canopy_points - filtered_canopy_points) / down_canopy_points * 100
-    pole_reduction_pct = (down_pole_points - filtered_pole_points) / down_pole_points * 100
-    stem_reduction_pct = (down_stem_points - filtered_stem_points) / down_stem_points * 100
-    obstacle_reduction_pct = (down_obstacle_points - filtered_obstacle_points) / down_obstacle_points * 100
-    navigable_reduction_pct = (down_navigable_points - filtered_navigable_points) / down_navigable_points * 100
+    # canopy_reduction_pct = (down_canopy_points - rad_filt_canopy_points) / down_canopy_points * 100
+    pole_reduction_pct = (down_pole_points - rad_filt_pole_points) / down_pole_points * 100
+    stem_reduction_pct = (down_stem_points - rad_filt_stem_points) / down_stem_points * 100
+    # obstacle_reduction_pct = (down_obstacle_points - rad_filt_obstacle_points) / down_obstacle_points * 100
+    # navigable_reduction_pct = (down_navigable_points - rad_filt_navigable_points) / down_navigable_points * 100
     
     logger.info(f"=================================")    
     logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
-    logger.info(f"Canopy points: {filtered_canopy_points} [-{canopy_reduction_pct:.2f}%]")
-    logger.info(f"Pole points: {filtered_pole_points} [-{pole_reduction_pct:.2f}%]")
-    logger.info(f"Stem points: {filtered_stem_points} [-{stem_reduction_pct:.2f}%]")
-    logger.info(f"Obstacle points: {filtered_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
-    logger.info(f"Navigable points: {filtered_navigable_points} [-{navigable_reduction_pct:.2f}%]")
+    # logger.info(f"Canopy points: {rad_filt_canopy_points} [-{canopy_reduction_pct:.2f}%]")
+    logger.info(f"Pole points: {rad_filt_pole_points} [-{pole_reduction_pct:.2f}%]")
+    logger.info(f"Stem points: {rad_filt_stem_points} [-{stem_reduction_pct:.2f}%]")
+    # logger.info(f"Obstacle points: {rad_filt_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
+    # logger.info(f"Navigable points: {rad_filt_navigable_points} [-{navigable_reduction_pct:.2f}%]")
     logger.info(f"=================================\n")
 
+    # logger.info(f"Number of points in rad_filt_canopy: {len(rad_filt_canopy.point['positions'])}")
+    # logger.info(f"Number of points in outliers_canopy: {len(outliers_canopy.point['positions'])}")
 
-    # exit(1)
     
-    filtered_canopy.paint_uniform_color([1.0, 1.0, 0.0])  # yellow
-    outliers_canopy.paint_uniform_color([1.0, 0.0, 0.0])  # red
-
-    logger.info(f"Number of points in filtered_canopy: {len(filtered_canopy.point['positions'])}")
-    logger.info(f"Number of points in outliers_canopy: {len(outliers_canopy.point['positions'])}")
-
-    # bev_canopy = collapse_along_y_axis(filtered_canopy)
-    # bev_pole = collapse_along_y_axis(filtered_pole)
-    # bev_stem = collapse_along_y_axis(filtered_stem)
-    # bev_obstacle = collapse_along_y_axis(filtered_obstacle)
-    # bev_navigable = collapse_along_y_axis(filtered_navigable)
-
-    # logger.info(f"=================================")    
-    # logger.info(f"BEV Canopy points count: {len(bev_canopy.point['positions'])}")
-    # logger.info(f"BEV Pole points count: {len(bev_pole.point['positions'])}")
-    # logger.info(f"BEV Stem points count: {len(bev_stem.point['positions'])}")
-    # logger.info(f"BEV Obstacle points count: {len(bev_obstacle.point['positions'])}")
-    # logger.info(f"BEV Navigable points count: {len(bev_navigable.point['positions'])}")
-    # logger.info(f"=================================\n")
     
-    # # Compute the number of points with the same (x,z) value in down_stem and down_pole
-    # down_pcd_positions = down_pcd.point['positions'].numpy()
-    # down_pole_positions = down_pole.point['positions'].numpy()
+    # projecting points to the navigable plane
+    normal, inliers = get_class_plane(pcd_navigable, LABELS["NAVIGABLE_SPACE"]["id"])
+    normal = normal / np.linalg.norm(normal)
 
-    # # Extract x and z coordinates
-    # down_pcd_xz = down_pcd_positions[:, [0, 2]]
-    # down_pole_xz = down_pole_positions[:, [0, 2]]
+    inliers_navigable = pcd_navigable.select_by_index(inliers)
 
-    # # Find unique (x,z) pairs in both point clouds
-    # unique_down_pcd_xz = np.unique(down_pcd_xz, axis=0)
-    # unique_down_pole_xz = np.unique(down_pole_xz, axis=0)
+    import matplotlib.pyplot as plt
 
-    # logger.info(f"Number of unique (x,z) pairs in down_pcd: {len(unique_down_pcd_xz)}")
-    # logger.info(f"Number of unique (x,z) pairs in down_pole: {len(unique_down_pole_xz)}")
+    # # Extract x, y, z values from inliers_navigable
+    # inliers_positions = inliers_navigable.point['positions'].numpy()
+    # x_values = inliers_positions[:, 0]
+    # y_values = inliers_positions[:, 1]
+    # z_values = inliers_positions[:, 2]
 
-    # #  View the 2D arrays as 1D structured arrays
-    # dtype = np.dtype((np.void, unique_down_pcd_xz.dtype.itemsize * unique_down_pcd_xz.shape[1]))
-    # unique_down_pcd_xz_flat = unique_down_pcd_xz.view(dtype).flatten()
-    # unique_down_pole_xz_flat = unique_down_pole_xz.view(dtype).flatten()
+    # # Plot histograms for x, y, z values
+    # fig, axs = plt.subplots(3, 1, figsize=(10, 15))
 
-    # # Find common (x,z) pairs between the two point clouds
-    # common_xz_flat = np.intersect1d(unique_down_pcd_xz_flat, unique_down_pole_xz_flat)
+    # axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
+    # axs[0].set_title('Histogram of X values')
+    # axs[0].set_xlabel('X')
+    # axs[0].set_ylabel('Frequency')
 
-    # # Convert back to the original shape
-    # common_xz = common_xz_flat.view(unique_down_pcd_xz.dtype).reshape(-1, unique_down_pcd_xz.shape[1])
+    # axs[1].hist(y_values, bins=50, color='g', alpha=0.7)
+    # axs[1].set_title('Histogram of Y values')
+    # axs[1].set_xlabel('Y')
+    # axs[1].set_ylabel('Frequency')
 
-    # logger.info(f"Number of common (x,z) pairs: {len(common_xz)}")
+    # axs[2].hist(z_values, bins=50, color='b', alpha=0.7)
+    # axs[2].set_title('Histogram of Z values')
+    # axs[2].set_xlabel('Z')
+    # axs[2].set_ylabel('Frequency')
 
-    # # Collapse all points for down_pole along the y-axis using tensor operations
-    # down_pole_positions = down_pole.point['positions'].numpy()
-    # collapsed_down_pole_positions = np.zeros_like(down_pole_positions)
-    # collapsed_down_pole_positions[:, [0, 2]] = down_pole_positions[:, [0, 2]]
-    # collapsed_down_pole = o3d.geometry.PointCloud()
-    # collapsed_down_pole.points = o3d.utility.Vector3dVector(collapsed_down_pole_positions)
+    # plt.tight_layout()
+    # plt.show()
 
-    # down_pole_tensor = down_pole.point['positions']
-    # down_pole_tensor[1] = 0
-    # collapsed_pole = o3d.t.geometry.PointCloud(down_pole_tensor)
+    
+    # compute angle with y-axis
+    angle_y = axis_angles(normal)[1]
+    logger.info(f"Angle between normal and y-axis: {angle_y:.2f} degrees")
 
-    # print("Statistical oulier removal")
-    # cl, ind = down_canopy.remove_statistical_outliers(nb_neighbors=20,
-    #                                                 std_ratio=0.1)
-    # display_inlier_outlier(down_canopy, ind)
+    # align normal with +y-axis if angle with y-axis is negative
+    if angle_y < 0:
+        normal = -normal
 
-    # cl, ind = down_canopy.remove_radius_outliers(nb_points=16, search_radius=0.05)
-    # display_inlier_outlier(down_canopy, ind)
+    # logger.info(f"rad_filt_canopy.point['positions'].shape: {rad_filt_canopy.point['positions'].shape}")
+    # logger.info(f"normal.shape: {normal.shape}")
+    
+    # normal_tensor = o3d.core.Tensor(normal, dtype=o3c.float32)
 
-    # cl_in = down_pole.select_by_mask(ind)
-    # cl_out = down_pole.select_by_mask(ind, invert=True)
+    # navigable_plane_model = get_plane_model(pcd_navigable, LABELS["NAVIGABLE_SPACE"]["id"])
+    # logger.warning(f"navigable_plane_model: {navigable_plane_model}")
 
-    # down_pole.paint_uniform_color([0.0, 1.0, 0.0])
+    projected_canopy = down_canopy.clone()
+    projected_canopy.point['positions'][:, 1] = 2.0
 
+    # projected_pole = down_pole.clone()
+    # projected_pole.point['positions'][:, 1] = 2.0
+
+    projected_pole = rad_filt_pole.clone()
+    projected_pole.point['positions'][:, 1] = 2.0
+
+    projected_stem = rad_filt_stem.clone()
+    projected_stem.point['positions'][:, 1] = 2.0
+
+    projected_obstacle = down_obstacle.clone()
+    projected_obstacle.point['positions'][:, 1] = 2.0
+    
+
+    # Extract x, y, z values from projected_canopy
+    # projected_positions = projected_canopy.point['positions'].numpy()
+    # x_values = projected_positions[:, 0]
+    # y_values = projected_positions[:, 1]
+    # z_values = projected_positions[:, 2]
+
+    # # Plot histograms for x, y, z values
+    # fig, axs = plt.subplots(3, 1, figsize=(10, 15))
+
+    # axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
+    # axs[0].set_title('Histogram of X values')
+    # axs[0].set_xlabel('X')
+    # axs[0].set_ylabel('Frequency')
+
+    # axs[1].hist(y_values, bins=50, color='g', alpha=0.7)
+    # axs[1].set_title('Histogram of Y values')
+    # axs[1].set_xlabel('Y')
+    # axs[1].set_ylabel('Frequency')
+
+    # axs[2].hist(z_values, bins=50, color='b', alpha=0.7)
+    # axs[2].set_title('Histogram of Z values')
+    # axs[2].set_xlabel('Z')
+    # axs[2].set_ylabel('Frequency')
+
+    # plt.tight_layout()
+    # plt.show()
+
+    # logger.info(f"projected_canopy.point['positions'].shape: {projected_canopy.point['positions'].shape}")
+
+    # rad_filt_canopy.paint_uniform_color([1.0, 0.0, 0.0])
+
+    # # bev generation
+    # bev_pole = collapse_along_y_axis(rad_filt_pole)
+    
     # visualization wind
     vis = o3d.visualization.Visualizer()
     vis.create_window()
@@ -380,9 +440,13 @@ if __name__ == "__main__":
     vis.add_geometry(coordinate_frame)
 
     # adding point clouds to visualizer
-    vis.add_geometry(filtered_canopy.to_legacy())
-    vis.add_geometry(outliers_canopy.to_legacy())
+    vis.add_geometry(projected_canopy.to_legacy())
+    vis.add_geometry(projected_pole.to_legacy())
+    vis.add_geometry(projected_stem.to_legacy())
+    vis.add_geometry(projected_obstacle.to_legacy())
+    vis.add_geometry(inliers_navigable.to_legacy())
     
+    # view control
     view_ctr = vis.get_view_control()
     view_ctr.set_front(np.array([0, 0, -1]))
     view_ctr.set_up(np.array([0, -1, 0]))
