@@ -129,34 +129,6 @@ def collapse_along_y_axis(pcd):
     pcd.point['positions'][:, 1] = 0
     return pcd
 
-
-# def project_points_to_plane_model(plane_model, pcd):
-#     '''
-#     Projects all the points of the point cloud along the plane defined by the plane model (a, b, c, d)
-#     '''
-#     logger.warning(f"Inside project_points_to_plane_model()")
-#     logger.warning(f"plane_model: {plane_model}")
-
-#     a, b, c, d = plane_model
-#     points = np.asarray(pcd.point['positions'])
-    
-#     # Normalize the plane normal vector
-#     normal = np.array([a, b, c])
-#     normal = normal / np.linalg.norm(normal)
-    
-#     # Calculate the distance from each point to the plane
-#     distances = (np.dot(points, normal) + d) / np.linalg.norm(normal)
-    
-#     # Project the points onto the plane
-#     projected_points = points - np.outer(distances, normal)
-    
-#     # Update the point cloud with the projected points
-#     pcd.point['positions'] = o3d.core.Tensor(projected_points, dtype=o3c.float32)
-    
-#     return pcd
-
-
-
 LABEL_COLOR_MAP = { 
     0: [0, 0, 0],        # black
     1: [246, 4, 228],    # purple
