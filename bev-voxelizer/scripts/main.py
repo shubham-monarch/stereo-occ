@@ -185,11 +185,20 @@ LABEL_ID_TO_PRIORITY = {
     2: 5,
 }
 
+def get_label_priority(label_id: int) -> int:
+    return LABEL_ID_TO_PRIORITY[label_id]
+
+def get_label_color(label_id: int) -> np.ndarray:
+    color = np.array(LABEL_COLOR_MAP[label_id]).astype(np.uint8)
+    color = color[::-1]  # Convert from BGR to RGB
+    # logger.info(f"color: {color} {color.shape} {color.dtype}")
+    return color
+
 
 if __name__ == "__main__":
     
     src_folder = "../ply/segmented-1056_to_1198/"
-    src_path = os.path.join(src_folder, "1.ply")
+    src_path = os.path.join(src_folder, "seg-3.ply")
     pcd_input = o3d.t.io.read_point_cloud(src_path)
 
     # logger.warning(f"type(pcd_input.point['positions']): {type(pcd_input.point['positions'])}") 
@@ -396,17 +405,17 @@ if __name__ == "__main__":
     projected_canopy.point['positions'][:, 1] = 2.0
 
     projected_pole = rad_filt_pole.clone()
-    projected_pole.point['positions'][:, 1] = 2.0
+    projected_pole.point['positions'][:, 1] = 1.95
 
     projected_stem = rad_filt_stem.clone()
-    projected_stem.point['positions'][:, 1] = 2.0
+    projected_stem.point['positions'][:, 1] = 1.98
 
     projected_obstacle = down_obstacle.clone()
-    projected_obstacle.point['positions'][:, 1] = 2.0
+    projected_obstacle.point['positions'][:, 1] = 1.9
 
 
     bev_collection = [inliers_navigable, projected_canopy, projected_pole, projected_stem, projected_obstacle]
-    bev_collection = [inliers_navigable, projected_pole, projected_stem, projected_obstacle]
+    # bev_collection = [inliers_navigable, projected_obstacle]
     
     # Vertically stack the point positions of the bev_collection pointclouds
     position_tensors = [pcd.point['positions'].numpy() for pcd in bev_collection]
@@ -420,11 +429,7 @@ if __name__ == "__main__":
     color_tensors = [pcd.point['colors'].numpy() for pcd in bev_collection]
     stacked_colors = o3c.Tensor(np.vstack(color_tensors), dtype=o3c.Dtype.UInt8)
     
-    # Create a color tensor of red color
-    # num_points = stacked_positions.shape[0]
-    # red_color = np.array([255, 0, 0], dtype=np.uint8)
-    # color_tensor = o3c.Tensor(np.tile(red_color, (num_points, 1)), dtype=o3c.Dtype.UInt8)
-
+    
     # Create a unified point cloud
     map_to_tensors = {}
     map_to_tensors['positions'] = stacked_positions
@@ -433,109 +438,72 @@ if __name__ == "__main__":
     # map_to_tensors['colors'] = color_tensor
     combined_pcd = o3d.t.geometry.PointCloud(map_to_tensors)
     
-    logger.info(f"type(inliers_navigable): {type(inliers_navigable)}")
-    logger.info(f"type(projected_pole): {type(projected_pole)}")
-    logger.info(f"type(combined_pcd): {type(combined_pcd)}")
-
-    # logger.info(f"=================================")    
-    # logger.info(f"combined_pcd.point['positions'].shape: {combined_pcd.point['positions'].shape} type: {type(combined_pcd.point['positions'])}")
-    # logger.info(f"combined_pcd.point['label'].shape: {combined_pcd.point['label'].shape} type: {type(combined_pcd.point['label'])}")
-    # logger.info(f"combined_pcd.point['colors'].shape: {combined_pcd.point['colors'].shape} type: {type(combined_pcd.point['colors'])}")
-    # logger.info(f"=================================\n")
+    # # stores the final labels for each (x, z) point
+    # xz_label_map = {}
     
-    # for pcd in bev_collection:
-    #     position_tensor = pcd.point['positions'].numpy()
-    #     color_tensor = pcd.point['colors'].numpy()
-    #     label_tensor = pcd.point['label'].numpy()
+    # positions_ = combined_pcd.point['positions'].numpy()
+    # labels_ = combined_pcd.point['label'].numpy()
+    # colors_ = combined_pcd.point['colors'].numpy()
+
+    # logger.warning(f"colors_[0]: {colors_[0]}")
+    # # logger.warning(f"type(labels_): {type(labels_)} {labels_.shape} {labels_.dtype}")
+    # # logger.warning(f"type(colors_): {type(colors_)} {colors_.shape} {colors_.dtype}")
+    # # logger.warning(f"type(positions_): {type(positions_)} {positions_.shape} {positions_.dtype}")
+
+    # for i in tqdm(range(len(positions_)), desc="Processing positions"):
+    #     x, y, z = positions_[i]
+    #     color = colors_[i]
+    #     curr_label = int(labels_[i][0])
+    #     # logger.warning(f"{curr_label} {type(curr_label)} {curr_label.shape} {curr_label.dtype}")
+    #     # break
+
+    #     if (x, z) not in xz_label_map:
+    #         xz_label_map[(x, z)] = curr_label
+    #     else:
+    #         existing_label = xz_label_map[(x, z)]
+    #         existing_priority = get_label_priority(existing_label)
+    #         curr_priority = get_label_priority(curr_label)
+            
+    #         if curr_priority < existing_priority:
+    #             xz_label_map[(x, z)] = curr_label
+
+    
+    # combined_pcd_clone = combined_pcd.clone()
+    # for i in tqdm(range(len(positions_)), desc="Processing points"):
+    #     x, y, z = positions_[i]
+    #     label_id = xz_label_map[(x, z)]
+    #     # logger.warning(f"{label_id} {type(label_id)} {label_id.shape} {label_id.dtype}")
+    #     combined_pcd_clone.point['label'][i] = label_id
+    #     combined_pcd_clone.point['colors'][i] = get_label_color(label_id)
         
-    #     logger.info(f"position_tensor.shape: {position_tensor.shape}")
-    #     logger.info(f"color_tensor.shape: {color_tensor.shape}")
-    #     logger.info(f"label_tensor.shape: {label_tensor.shape}")
+    #     # logger.info(f"combined_pcd_clone.point['colors'][i]: {combined_pcd_clone.point['colors'][i]}")
+    #     # logger.info(f"type(combined_pcd_clone.point['colors'][i]): {type(combined_pcd_clone.point['colors'][i])}")
+    #     # logger.info(f"combined_pcd_clone.point['colors'][i].shape: {combined_pcd_clone.point['colors'][i].shape}")
+    #     # logger.info(f"combined_pcd_clone.point['colors'][i].dtype: {combined_pcd_clone.point['colors'][i].dtype}")
+    #     # break
+    #     # break
     
+    # def find_common_xz_pairs(pcd1, pcd2):
+    #     positions1 = pcd1.point['positions'].numpy()
+    #     positions2 = pcd2.point['positions'].numpy()
+    #     labels1 = pcd1.point['label'].numpy()
+    #     labels2 = pcd2.point['label'].numpy()
 
-    # # Vertically stack the point positions of the bev_collection pointclouds
-    # position_tensors = [pcd.point['positions'].numpy() for pcd in bev_collection]
-    # stacked_positions = o3c.Tensor(np.vstack(position_tensors), dtype=o3c.float32)
-    
-    # # Vertically stack the point labels of the bev_collection pointclouds
-    # label_tensors = [pcd.point['label'].numpy() for pcd in bev_collection]
-    # stacked_labels = o3c.Tensor(np.vstack(label_tensors), dtype=o3c.int32)
+    #     xz_pairs1 = {(x, z): labels1[i] for i, (x, y, z) in enumerate(positions1)}
+    #     xz_pairs2 = {(x, z): labels2[i] for i, (x, y, z) in enumerate(positions2)}
 
+    #     common_pairs = set(xz_pairs1.keys()) & set(xz_pairs2.keys())
+    #     return common_pairs, xz_pairs1, xz_pairs2
 
-    # # Replace the 'label' field with LABEL_ID_TO_PRIORITY[label]
-    # priority_labels = [LABEL_ID_TO_PRIORITY[label] for label in stacked_labels.numpy().flatten()]
-    # stacked_priority_labels = o3c.Tensor(np.array(priority_labels).reshape(stacked_labels.shape), dtype=o3c.int32)
-    
-    # logger.info(f"stacked_priority_labels[10,10,10]: {stacked_priority_labels[10,10,10]}")
-    # logger.info(f"stacked_priority_labels[10,10,100]: {stacked_priority_labels[10,10,10]}")
-    
+    # common_pairs, xz_pairs1, xz_pairs2 = find_common_xz_pairs(projected_canopy, projected_pole)
+    # logger.info(f"Number of common (x, z) pairs: {len(common_pairs)}")
 
-    # # Vertically stack the point colors of the bev_collection pointclouds
-    # color_tensors = [pcd.point['colors'].numpy() for pcd in bev_collection]
-    # stacked_colors = o3c.Tensor(np.vstack(color_tensors), dtype=o3c.float32)
-    
-    # logger.warning(f"stacked_positions.shape: {stacked_positions.shape}")
-    # logger.warning(f"stacked_labels.shape: {stacked_labels.shape}")
-    # logger.warning(f"stacked_colors.shape: {stacked_colors.shape}")
-
-    
-    # logger.warning(f"stacked_positions.shape: {stacked_positions.shape}")
-
-    # exit(1)
-    # bev_pcd = o3d.t.geometry.PointCloud()
-    
-    # map_to_tensors = {}
-    # position_tensors = []
-    # color_tensors = []
-    # label_tensors = []
+    # for pair in common_pairs:
+    #     label1 = xz_pairs1[pair]
+    #     label2 = xz_pairs2[pair]
+    #     logger.info(f"Common (x, z) pair: {pair}, Label in projected_canopy: {label1}, Label in projected_pole: {label2}")
 
 
-
-        
-
-        
-    # logger.warning(f"=================================")    
-    # logger.warning(f"position_tensors.shape: {position_tensors.shape}")
-    # logger.warning(f"color_tensors.shape: {color_tensors.shape}")
-    # logger.warning(f"label_tensors.shape: {label_tensors.shape}")   
-    # logger.warning(f"=================================\n")
-
-    # exit(1)
-
-    # Extract x, y, z values from projected_canopy
-    # projected_positions = projected_canopy.point['positions'].numpy()
-    # x_values = projected_positions[:, 0]
-    # y_values = projected_positions[:, 1]
-    # z_values = projected_positions[:, 2]
-
-    # # Plot histograms for x, y, z values
-    # fig, axs = plt.subplots(3, 1, figsize=(10, 15))
-
-    # axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
-    # axs[0].set_title('Histogram of X values')
-    # axs[0].set_xlabel('X')
-    # axs[0].set_ylabel('Frequency')
-
-    # axs[1].hist(y_values, bins=50, color='g', alpha=0.7)
-    # axs[1].set_title('Histogram of Y values')
-    # axs[1].set_xlabel('Y')
-    # axs[1].set_ylabel('Frequency')
-
-    # axs[2].hist(z_values, bins=50, color='b', alpha=0.7)
-    # axs[2].set_title('Histogram of Z values')
-    # axs[2].set_xlabel('Z')
-    # axs[2].set_ylabel('Frequency')
-
-    # plt.tight_layout()
-    # plt.show()
-
-    # logger.info(f"projected_canopy.point['positions'].shape: {projected_canopy.point['positions'].shape}")
-
-    # rad_filt_canopy.paint_uniform_color([1.0, 0.0, 0.0])
-
-    # # bev generation
-    # bev_pole = collapse_along_y_axis(rad_filt_pole)
-    
     # visualization wind
     vis = o3d.visualization.Visualizer()
     vis.create_window()
@@ -544,7 +512,7 @@ if __name__ == "__main__":
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1, origin=[0, 0, 0])
     vis.add_geometry(coordinate_frame)
 
-    # adding point clouds to visualizer
+    # adding point clouds to visusalizer
     vis.add_geometry(combined_pcd.to_legacy())
     # vis.add_geometry(projected_canopy.to_legacy())
     # vis.add_geometry(projected_pole.to_legacy())
