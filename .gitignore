@@ -29,7 +29,7 @@ build/*
 *.jpg
 *.jpeg
 *.swp
-
+*.ply.*
 *.out
 *.fuse*
 *.svo*
