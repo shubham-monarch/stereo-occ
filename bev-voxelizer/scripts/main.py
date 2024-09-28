@@ -26,6 +26,7 @@ from utils import io_utils
 # - remove below-ground points
 # - statistical outlier removal
 # - refactor compute_tilt_matrix()
+# - make project_to_ground_plane more robust
 # - remove non-inliers ground points
 
 # LOGGING SETUP
@@ -175,6 +176,15 @@ LABELS = {
     "VINE_STEM": {"id": 4, "priority": 4},  
     "NAVIGABLE_SPACE": {"id": 2, "priority": 5},  
 }
+
+LABEL_ID_TO_PRIORITY = {
+    1: 1,
+    5: 2,
+    4: 3,
+    3: 4,
+    2: 5,
+}
+
 
 if __name__ == "__main__":
     
@@ -381,11 +391,9 @@ if __name__ == "__main__":
     # navigable_plane_model = get_plane_model(pcd_navigable, LABELS["NAVIGABLE_SPACE"]["id"])
     # logger.warning(f"navigable_plane_model: {navigable_plane_model}")
 
+    # label-wise BEV generation
     projected_canopy = down_canopy.clone()
     projected_canopy.point['positions'][:, 1] = 2.0
-
-    # projected_pole = down_pole.clone()
-    # projected_pole.point['positions'][:, 1] = 2.0
 
     projected_pole = rad_filt_pole.clone()
     projected_pole.point['positions'][:, 1] = 2.0
@@ -395,7 +403,104 @@ if __name__ == "__main__":
 
     projected_obstacle = down_obstacle.clone()
     projected_obstacle.point['positions'][:, 1] = 2.0
+
+
+    bev_collection = [inliers_navigable, projected_canopy, projected_pole, projected_stem, projected_obstacle]
+    bev_collection = [inliers_navigable, projected_pole, projected_stem, projected_obstacle]
     
+    # Vertically stack the point positions of the bev_collection pointclouds
+    position_tensors = [pcd.point['positions'].numpy() for pcd in bev_collection]
+    stacked_positions = o3c.Tensor(np.vstack(position_tensors), dtype=o3c.Dtype.Float32)
+    
+    # # Vertically stack the point labels of the bev_collection pointclouds
+    label_tensors = [pcd.point['label'].numpy() for pcd in bev_collection]
+    stacked_labels = o3c.Tensor(np.vstack(label_tensors), dtype=o3c.Dtype.Int32)
+
+    # # Vertically stack the point colors of the bev_collection pointclouds
+    color_tensors = [pcd.point['colors'].numpy() for pcd in bev_collection]
+    stacked_colors = o3c.Tensor(np.vstack(color_tensors), dtype=o3c.Dtype.UInt8)
+    
+    # Create a color tensor of red color
+    # num_points = stacked_positions.shape[0]
+    # red_color = np.array([255, 0, 0], dtype=np.uint8)
+    # color_tensor = o3c.Tensor(np.tile(red_color, (num_points, 1)), dtype=o3c.Dtype.UInt8)
+
+    # Create a unified point cloud
+    map_to_tensors = {}
+    map_to_tensors['positions'] = stacked_positions
+    map_to_tensors['label'] = stacked_labels
+    map_to_tensors['colors'] = stacked_colors
+    # map_to_tensors['colors'] = color_tensor
+    combined_pcd = o3d.t.geometry.PointCloud(map_to_tensors)
+    
+    logger.info(f"type(inliers_navigable): {type(inliers_navigable)}")
+    logger.info(f"type(projected_pole): {type(projected_pole)}")
+    logger.info(f"type(combined_pcd): {type(combined_pcd)}")
+
+    # logger.info(f"=================================")    
+    # logger.info(f"combined_pcd.point['positions'].shape: {combined_pcd.point['positions'].shape} type: {type(combined_pcd.point['positions'])}")
+    # logger.info(f"combined_pcd.point['label'].shape: {combined_pcd.point['label'].shape} type: {type(combined_pcd.point['label'])}")
+    # logger.info(f"combined_pcd.point['colors'].shape: {combined_pcd.point['colors'].shape} type: {type(combined_pcd.point['colors'])}")
+    # logger.info(f"=================================\n")
+    
+    # for pcd in bev_collection:
+    #     position_tensor = pcd.point['positions'].numpy()
+    #     color_tensor = pcd.point['colors'].numpy()
+    #     label_tensor = pcd.point['label'].numpy()
+        
+    #     logger.info(f"position_tensor.shape: {position_tensor.shape}")
+    #     logger.info(f"color_tensor.shape: {color_tensor.shape}")
+    #     logger.info(f"label_tensor.shape: {label_tensor.shape}")
+    
+
+    # # Vertically stack the point positions of the bev_collection pointclouds
+    # position_tensors = [pcd.point['positions'].numpy() for pcd in bev_collection]
+    # stacked_positions = o3c.Tensor(np.vstack(position_tensors), dtype=o3c.float32)
+    
+    # # Vertically stack the point labels of the bev_collection pointclouds
+    # label_tensors = [pcd.point['label'].numpy() for pcd in bev_collection]
+    # stacked_labels = o3c.Tensor(np.vstack(label_tensors), dtype=o3c.int32)
+
+
+    # # Replace the 'label' field with LABEL_ID_TO_PRIORITY[label]
+    # priority_labels = [LABEL_ID_TO_PRIORITY[label] for label in stacked_labels.numpy().flatten()]
+    # stacked_priority_labels = o3c.Tensor(np.array(priority_labels).reshape(stacked_labels.shape), dtype=o3c.int32)
+    
+    # logger.info(f"stacked_priority_labels[10,10,10]: {stacked_priority_labels[10,10,10]}")
+    # logger.info(f"stacked_priority_labels[10,10,100]: {stacked_priority_labels[10,10,10]}")
+    
+
+    # # Vertically stack the point colors of the bev_collection pointclouds
+    # color_tensors = [pcd.point['colors'].numpy() for pcd in bev_collection]
+    # stacked_colors = o3c.Tensor(np.vstack(color_tensors), dtype=o3c.float32)
+    
+    # logger.warning(f"stacked_positions.shape: {stacked_positions.shape}")
+    # logger.warning(f"stacked_labels.shape: {stacked_labels.shape}")
+    # logger.warning(f"stacked_colors.shape: {stacked_colors.shape}")
+
+    
+    # logger.warning(f"stacked_positions.shape: {stacked_positions.shape}")
+
+    # exit(1)
+    # bev_pcd = o3d.t.geometry.PointCloud()
+    
+    # map_to_tensors = {}
+    # position_tensors = []
+    # color_tensors = []
+    # label_tensors = []
+
+
+
+        
+
+        
+    # logger.warning(f"=================================")    
+    # logger.warning(f"position_tensors.shape: {position_tensors.shape}")
+    # logger.warning(f"color_tensors.shape: {color_tensors.shape}")
+    # logger.warning(f"label_tensors.shape: {label_tensors.shape}")   
+    # logger.warning(f"=================================\n")
+
+    # exit(1)
 
     # Extract x, y, z values from projected_canopy
     # projected_positions = projected_canopy.point['positions'].numpy()
@@ -440,12 +545,13 @@ if __name__ == "__main__":
     vis.add_geometry(coordinate_frame)
 
     # adding point clouds to visualizer
-    vis.add_geometry(projected_canopy.to_legacy())
-    vis.add_geometry(projected_pole.to_legacy())
-    vis.add_geometry(projected_stem.to_legacy())
-    vis.add_geometry(projected_obstacle.to_legacy())
-    vis.add_geometry(inliers_navigable.to_legacy())
-    
+    vis.add_geometry(combined_pcd.to_legacy())
+    # vis.add_geometry(projected_canopy.to_legacy())
+    # vis.add_geometry(projected_pole.to_legacy())
+    # vis.add_geometry(projected_stem.to_legacy())
+    # vis.add_geometry(projected_obstacle.to_legacy())
+    # vis.add_geometry(inliers_navigable.to_legacy())
+    # vis.add_geometry(combined_pcd.to_legacy())
     # view control
     view_ctr = vis.get_view_control()
     view_ctr.set_front(np.array([0, 0, -1]))
