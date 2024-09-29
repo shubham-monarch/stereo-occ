@@ -169,8 +169,8 @@ def get_label_color(label_id: int) -> np.ndarray:
 
 if __name__ == "__main__":
     
-    src_folder = "ply/segmented-1056_to_1198/"
-    src_path = os.path.join(src_folder, "seg-3.ply")
+    src_folder = "pcd-files/vineyards/"
+    src_path = os.path.join(src_folder, "vineyards_RJM_10.ply")
     pcd_input = o3d.t.io.read_point_cloud(src_path)
 
     # logger.warning(f"type(pcd_input.point['positions']): {type(pcd_input.point['positions'])}") 
@@ -255,10 +255,12 @@ if __name__ == "__main__":
     # downsampling label-wise pointcloud
     down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.01)
     down_canopy = pcd_canopy.voxel_down_sample(voxel_size=0.01)
-    down_pole = pcd_pole.voxel_down_sample(voxel_size=0.01)
+    # down_pole = pcd_pole.voxel_down_sample(voxel_size=0.01)
     down_navigable = pcd_navigable.voxel_down_sample(voxel_size=0.01)
     # down_stem = pcd_stem.voxel_down_sample(voxel_size=0.01)
     # down_obstacle = pcd_obstacle.voxel_down_sample(voxel_size=0.01)
+    
+    # NOT DOWN-SAMPLING [obstacle, stem, pole]
     down_obstacle = pcd_obstacle.clone()
     down_stem = pcd_stem.clone()
     down_pole = pcd_pole.clone()
@@ -291,19 +293,19 @@ if __name__ == "__main__":
     # rad_filt_canopy, outliers_canopy = filter_radius_outliers(down_canopy, nb_points=1, search_radius=0.1)
     rad_filt_pole, _ = filter_radius_outliers(down_pole, nb_points=16, search_radius=0.05)
     rad_filt_stem, _ = filter_radius_outliers(down_stem, nb_points=16, search_radius=0.05)
-    # rad_filt_obstacle, _ = filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)
+    rad_filt_obstacle, _ = filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)
     # rad_filt_navigable, _ = filter_radius_outliers(down_navigable, nb_points=16, search_radius=0.05)
 
     # rad_filt_canopy_points = len(rad_filt_canopy.point['positions'].numpy())
     rad_filt_pole_points = len(rad_filt_pole.point['positions'].numpy())
     rad_filt_stem_points = len(rad_filt_stem.point['positions'].numpy())
-    # rad_filt_obstacle_points = len(rad_filt_obstacle.point['positions'].numpy())
+    rad_filt_obstacle_points = len(rad_filt_obstacle.point['positions'].numpy())
     # rad_filt_navigable_points = len(rad_filt_navigable.point['positions'].numpy())
 
     # canopy_reduction_pct = (down_canopy_points - rad_filt_canopy_points) / down_canopy_points * 100
     pole_reduction_pct = (down_pole_points - rad_filt_pole_points) / down_pole_points * 100
     stem_reduction_pct = (down_stem_points - rad_filt_stem_points) / down_stem_points * 100
-    # obstacle_reduction_pct = (down_obstacle_points - rad_filt_obstacle_points) / down_obstacle_points * 100
+    obstacle_reduction_pct = (down_obstacle_points - rad_filt_obstacle_points) / down_obstacle_points * 100
     # navigable_reduction_pct = (down_navigable_points - rad_filt_navigable_points) / down_navigable_points * 100
     
     logger.info(f"=================================")    
@@ -311,7 +313,7 @@ if __name__ == "__main__":
     # logger.info(f"Canopy points: {rad_filt_canopy_points} [-{canopy_reduction_pct:.2f}%]")
     logger.info(f"Pole points: {rad_filt_pole_points} [-{pole_reduction_pct:.2f}%]")
     logger.info(f"Stem points: {rad_filt_stem_points} [-{stem_reduction_pct:.2f}%]")
-    # logger.info(f"Obstacle points: {rad_filt_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
+    logger.info(f"Obstacle points: {rad_filt_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
     # logger.info(f"Navigable points: {rad_filt_navigable_points} [-{navigable_reduction_pct:.2f}%]")
     logger.info(f"=================================\n")
 
@@ -382,7 +384,7 @@ if __name__ == "__main__":
     projected_stem = rad_filt_stem.clone()
     projected_stem.point['positions'][:, 1] = 1.98
 
-    projected_obstacle = down_obstacle.clone()
+    projected_obstacle = rad_filt_obstacle.clone()
     projected_obstacle.point['positions'][:, 1] = 1.9
 
 
