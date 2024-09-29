@@ -17,15 +17,9 @@ from utils import io_utils
 # - priority based collapsing
 # - crop pointcloud to bounding boxs
 # - hidden point removal 
-# - different downsampling ratios for different classes
-# - removal of below-ground points
-# - testing over 50 pointclouds
-# - custom voxel downsampling
 # - farthest point sampling
 # - checkout bev-former voxelizer
-# - remove below-ground points
 # - statistical outlier removal
-# - remove ground depth hard-coding
 # - refactor LABEL dict
 # - refactor compute_tilt_matrix()
 # - make project_to_ground_plane more robust
@@ -136,13 +130,11 @@ def plot_plane_histogram(pcd):
     
     import matplotlib.pyplot as plt
 
-    # Extract x, y, z values from inliers_navigable
     positions = pcd.point['positions'].numpy()
     x_values = positions[:, 0]
     y_values = positions[:, 1]
     z_values = positions[:, 2]
 
-    # Plot histograms for x, y, z values
     fig, axs = plt.subplots(3, 1, figsize=(10, 15))
 
     axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
@@ -164,18 +156,6 @@ def plot_plane_histogram(pcd):
     plt.show()
 
 
-LABEL_COLOR_MAP = { 
-    0: [0, 0, 0],        # black
-    1: [246, 4, 228],    # purple
-    2: [173, 94, 48],    # blue
-    3: [68, 171, 117],   # brown
-    4: [162, 122, 174],  # gray
-    5: [121, 119, 148],  # pink
-    6: [253, 75, 40],    # orange
-    7: [170, 60, 100],   # dark pink
-    8: [60, 100, 179]    # green
-}
-
 LABELS = {    
     "OBSTACLE": {"id": 1, "priority": 1},
     "VINE_POLE": {"id": 5, "priority": 2},  
@@ -184,31 +164,12 @@ LABELS = {
     "NAVIGABLE_SPACE": {"id": 2, "priority": 5},  
 }
 
-LABEL_ID_TO_PRIORITY = {
-    1: 1,
-    5: 2,
-    4: 3,
-    3: 4,
-    2: 5,
-}
-
-def get_label_priority(label_id: int) -> int:
-    return LABEL_ID_TO_PRIORITY[label_id]
-
-def get_label_color(label_id: int) -> np.ndarray:
-    color = np.array(LABEL_COLOR_MAP[label_id]).astype(np.uint8)
-    color = color[::-1]  # Convert from BGR to RGB
-    # logger.info(f"color: {color} {color.shape} {color.dtype}")
-    return color
-
-
 if __name__ == "__main__":
     
     src_folder = "pcd-files/vineyards/"
     src_path = os.path.join(src_folder, "vineyards_RJM_1.ply")
     pcd_input = o3d.t.io.read_point_cloud(src_path)
 
-    # logger.warning(f"type(pcd_input.point['positions']): {type(pcd_input.point['positions'])}") 
     
     # pcd correction
     R = compute_tilt_matrix(pcd_input)
@@ -290,10 +251,7 @@ if __name__ == "__main__":
     # downsampling label-wise pointcloud
     down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.01)
     down_canopy = pcd_canopy.voxel_down_sample(voxel_size=0.01)
-    # down_pole = pcd_pole.voxel_down_sample(voxel_size=0.01)
     down_navigable = pcd_navigable.voxel_down_sample(voxel_size=0.01)
-    # down_stem = pcd_stem.voxel_down_sample(voxel_size=0.01)
-    # down_obstacle = pcd_obstacle.voxel_down_sample(voxel_size=0.01)
     
     # NOT DOWN-SAMPLING [obstacle, stem, pole]
     down_obstacle = pcd_obstacle.clone()
