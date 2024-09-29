@@ -15,7 +15,7 @@ from utils import io_utils
 
 # TO-DO
 # - priority based collapsing
-# - crop pointcloud to bounding box
+# - crop pointcloud to bounding boxs
 # - hidden point removal 
 # - different downsampling ratios for different classes
 # - removal of below-ground points
@@ -25,9 +25,12 @@ from utils import io_utils
 # - checkout bev-former voxelizer
 # - remove below-ground points
 # - statistical outlier removal
+# - remove ground depth hard-coding
+# - refactor LABEL dict
 # - refactor compute_tilt_matrix()
 # - make project_to_ground_plane more robust
 # - remove non-inliers ground points
+# - fix divide by zero error
 
 # LOGGING SETUP
 logger = logging.getLogger(__name__)
@@ -129,6 +132,38 @@ def collapse_along_y_axis(pcd):
     pcd.point['positions'][:, 1] = 0
     return pcd
 
+def plot_plane_histogram(pcd):
+    
+    import matplotlib.pyplot as plt
+
+    # Extract x, y, z values from inliers_navigable
+    positions = pcd.point['positions'].numpy()
+    x_values = positions[:, 0]
+    y_values = positions[:, 1]
+    z_values = positions[:, 2]
+
+    # Plot histograms for x, y, z values
+    fig, axs = plt.subplots(3, 1, figsize=(10, 15))
+
+    axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
+    axs[0].set_title('Histogram of X values')
+    axs[0].set_xlabel('X')
+    axs[0].set_ylabel('Frequency')
+
+    axs[1].hist(y_values, bins=50, color='g', alpha=0.7)
+    axs[1].set_title('Histogram of Y values')
+    axs[1].set_xlabel('Y')
+    axs[1].set_ylabel('Frequency')
+
+    axs[2].hist(z_values, bins=50, color='b', alpha=0.7)
+    axs[2].set_title('Histogram of Z values')
+    axs[2].set_xlabel('Z')
+    axs[2].set_ylabel('Frequency')
+
+    plt.tight_layout()
+    plt.show()
+
+
 LABEL_COLOR_MAP = { 
     0: [0, 0, 0],        # black
     1: [246, 4, 228],    # purple
@@ -170,7 +205,7 @@ def get_label_color(label_id: int) -> np.ndarray:
 if __name__ == "__main__":
     
     src_folder = "pcd-files/vineyards/"
-    src_path = os.path.join(src_folder, "vineyards_RJM_10.ply")
+    src_path = os.path.join(src_folder, "vineyards_RJM_1.ply")
     pcd_input = o3d.t.io.read_point_cloud(src_path)
 
     # logger.warning(f"type(pcd_input.point['positions']): {type(pcd_input.point['positions'])}") 
@@ -328,35 +363,7 @@ if __name__ == "__main__":
 
     inliers_navigable = pcd_navigable.select_by_index(inliers)
 
-    import matplotlib.pyplot as plt
-
-    # # Extract x, y, z values from inliers_navigable
-    # inliers_positions = inliers_navigable.point['positions'].numpy()
-    # x_values = inliers_positions[:, 0]
-    # y_values = inliers_positions[:, 1]
-    # z_values = inliers_positions[:, 2]
-
-    # # Plot histograms for x, y, z values
-    # fig, axs = plt.subplots(3, 1, figsize=(10, 15))
-
-    # axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
-    # axs[0].set_title('Histogram of X values')
-    # axs[0].set_xlabel('X')
-    # axs[0].set_ylabel('Frequency')
-
-    # axs[1].hist(y_values, bins=50, color='g', alpha=0.7)
-    # axs[1].set_title('Histogram of Y values')
-    # axs[1].set_xlabel('Y')
-    # axs[1].set_ylabel('Frequency')
-
-    # axs[2].hist(z_values, bins=50, color='b', alpha=0.7)
-    # axs[2].set_title('Histogram of Z values')
-    # axs[2].set_xlabel('Z')
-    # axs[2].set_ylabel('Frequency')
-
-    # plt.tight_layout()
-    # plt.show()
-
+    plot_plane_histogram(inliers_navigable)
     
     # compute angle with y-axis
     angle_y = axis_angles(normal)[1]
@@ -374,21 +381,32 @@ if __name__ == "__main__":
     # navigable_plane_model = get_plane_model(pcd_navigable, LABELS["NAVIGABLE_SPACE"]["id"])
     # logger.warning(f"navigable_plane_model: {navigable_plane_model}")
 
-    # label-wise BEV generation
+
+    # mean_y_value = float(np.mean(inliers_navigable.point['positions'][:, 1]))
+    # logger.info(f"Mean value of Y coordinates: {mean_y_value}")
+    
+    inliers_positions = inliers_navigable.point['positions'].numpy()
+    y_values = inliers_positions[:, 1]
+    mean_y_value = float(np.mean(y_values))
+    logger.info(f"Mean value of Y coordinates: {mean_y_value}")
+    
+    # label-wise BEV generations
     projected_canopy = down_canopy.clone()
-    projected_canopy.point['positions'][:, 1] = 2.0
+    projected_canopy.point['positions'][:, 1] = float(mean_y_value) - 0.07
 
     projected_pole = rad_filt_pole.clone()
-    projected_pole.point['positions'][:, 1] = 1.95
+    projected_pole.point['positions'][:, 1] = float(mean_y_value) - 0.09
 
     projected_stem = rad_filt_stem.clone()
-    projected_stem.point['positions'][:, 1] = 1.98
+    projected_stem.point['positions'][:, 1] = float(mean_y_value) - 0.08
 
     projected_obstacle = rad_filt_obstacle.clone()
-    projected_obstacle.point['positions'][:, 1] = 1.9
+    projected_obstacle.point['positions'][:, 1] = float(mean_y_value) - 0.1
 
 
     bev_collection = [inliers_navigable, projected_canopy, projected_pole, projected_stem, projected_obstacle]
+    # bev_collection = [projected_canopy, projected_pole, projected_stem, projected_obstacle]
+    # bev_collection = [inliers_navigable, projected_canopy, projected_pole, projected_stem, projected_obstacle]
     # bev_collection = [inliers_navigable, projected_obstacle]
     
     # Vertically stack the point positions of the bev_collection pointclouds
@@ -412,72 +430,7 @@ if __name__ == "__main__":
     # map_to_tensors['colors'] = color_tensor
     combined_pcd = o3d.t.geometry.PointCloud(map_to_tensors)
     
-    # # stores the final labels for each (x, z) point
-    # xz_label_map = {}
     
-    # positions_ = combined_pcd.point['positions'].numpy()
-    # labels_ = combined_pcd.point['label'].numpy()
-    # colors_ = combined_pcd.point['colors'].numpy()
-
-    # logger.warning(f"colors_[0]: {colors_[0]}")
-    # # logger.warning(f"type(labels_): {type(labels_)} {labels_.shape} {labels_.dtype}")
-    # # logger.warning(f"type(colors_): {type(colors_)} {colors_.shape} {colors_.dtype}")
-    # # logger.warning(f"type(positions_): {type(positions_)} {positions_.shape} {positions_.dtype}")
-
-    # for i in tqdm(range(len(positions_)), desc="Processing positions"):
-    #     x, y, z = positions_[i]
-    #     color = colors_[i]
-    #     curr_label = int(labels_[i][0])
-    #     # logger.warning(f"{curr_label} {type(curr_label)} {curr_label.shape} {curr_label.dtype}")
-    #     # break
-
-    #     if (x, z) not in xz_label_map:
-    #         xz_label_map[(x, z)] = curr_label
-    #     else:
-    #         existing_label = xz_label_map[(x, z)]
-    #         existing_priority = get_label_priority(existing_label)
-    #         curr_priority = get_label_priority(curr_label)
-            
-    #         if curr_priority < existing_priority:
-    #             xz_label_map[(x, z)] = curr_label
-
-    
-    # combined_pcd_clone = combined_pcd.clone()
-    # for i in tqdm(range(len(positions_)), desc="Processing points"):
-    #     x, y, z = positions_[i]
-    #     label_id = xz_label_map[(x, z)]
-    #     # logger.warning(f"{label_id} {type(label_id)} {label_id.shape} {label_id.dtype}")
-    #     combined_pcd_clone.point['label'][i] = label_id
-    #     combined_pcd_clone.point['colors'][i] = get_label_color(label_id)
-        
-    #     # logger.info(f"combined_pcd_clone.point['colors'][i]: {combined_pcd_clone.point['colors'][i]}")
-    #     # logger.info(f"type(combined_pcd_clone.point['colors'][i]): {type(combined_pcd_clone.point['colors'][i])}")
-    #     # logger.info(f"combined_pcd_clone.point['colors'][i].shape: {combined_pcd_clone.point['colors'][i].shape}")
-    #     # logger.info(f"combined_pcd_clone.point['colors'][i].dtype: {combined_pcd_clone.point['colors'][i].dtype}")
-    #     # break
-    #     # break
-    
-    # def find_common_xz_pairs(pcd1, pcd2):
-    #     positions1 = pcd1.point['positions'].numpy()
-    #     positions2 = pcd2.point['positions'].numpy()
-    #     labels1 = pcd1.point['label'].numpy()
-    #     labels2 = pcd2.point['label'].numpy()
-
-    #     xz_pairs1 = {(x, z): labels1[i] for i, (x, y, z) in enumerate(positions1)}
-    #     xz_pairs2 = {(x, z): labels2[i] for i, (x, y, z) in enumerate(positions2)}
-
-    #     common_pairs = set(xz_pairs1.keys()) & set(xz_pairs2.keys())
-    #     return common_pairs, xz_pairs1, xz_pairs2
-
-    # common_pairs, xz_pairs1, xz_pairs2 = find_common_xz_pairs(projected_canopy, projected_pole)
-    # logger.info(f"Number of common (x, z) pairs: {len(common_pairs)}")
-
-    # for pair in common_pairs:
-    #     label1 = xz_pairs1[pair]
-    #     label2 = xz_pairs2[pair]
-    #     logger.info(f"Common (x, z) pair: {pair}, Label in projected_canopy: {label1}, Label in projected_pole: {label2}")
-
-
     # visualization wind
     vis = o3d.visualization.Visualizer()
     vis.create_window()
@@ -495,11 +448,19 @@ if __name__ == "__main__":
     # vis.add_geometry(inliers_navigable.to_legacy())
     # vis.add_geometry(combined_pcd.to_legacy())
     # view control
-    view_ctr = vis.get_view_control()
-    view_ctr.set_front(np.array([0, 0, -1]))
-    view_ctr.set_up(np.array([0, -1, 0]))
-    # view_ctr.set_up(np.array([0, 1, 0]))
     
+    
+    view_ctr = vis.get_view_control()
+    view_ctr.set_front(np.array([0, -1, 0]))
+    view_ctr.set_up(np.array([0, 0, 1]))
+
+    view_ctr.set_zoom(0.7)
+
+    # Capture the screen and save it as an image
+    vis.poll_events()
+    vis.update_renderer()
+    vis.capture_screen_image("projection_image.png")
+
     vis.run()
     vis.destroy_window()
 
