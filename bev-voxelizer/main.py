@@ -177,6 +177,27 @@ class BevVoxelizer:
     def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
         # pcd tilt correction
         R = self.compute_tilt_matrix(pcd_input)
+        # Convert rotation matrix R to yaw, pitch, roll
+        def rotation_matrix_to_ypr(R):
+            sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
+            singular = sy < 1e-6
+
+            if not singular:
+                yaw = np.arctan2(R[2, 1], R[2, 2])
+                pitch = np.arctan2(-R[2, 0], sy)
+                roll = np.arctan2(R[1, 0], R[0, 0])
+            else:
+                yaw = np.arctan2(-R[1, 2], R[1, 1])
+                pitch = np.arctan2(-R[2, 0], sy)
+                roll = 0
+
+            return np.degrees(yaw), np.degrees(pitch), np.degrees(roll)
+
+        yaw, pitch, roll = rotation_matrix_to_ypr(R)
+
+        logger.warning(f"=================================")    
+        logger.warning(f"Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
+        logger.warning(f"=================================")    
         
         # sanity check
         normal, _ = self.get_class_plane(pcd_input, self.LABELS["NAVIGABLE_SPACE"]["id"])
@@ -284,7 +305,8 @@ class BevVoxelizer:
         # radius-based outlier removal
         rad_filt_pole = down_pole if len(down_pole.point['positions']) == 0 else self.filter_radius_outliers(down_pole, nb_points=16, search_radius=0.05)[0]
         rad_filt_stem = down_stem if len(down_stem.point['positions']) == 0 else self.filter_radius_outliers(down_stem, nb_points=16, search_radius=0.05)[0]
-        rad_filt_obstacle = down_obstacle if len(down_obstacle.point['positions']) == 0 else self.filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)[0]
+        # rad_filt_obstacle = down_obstacle if len(down_obstacle.point['positions']) == 0 else self.filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)[0]
+        rad_filt_obstacle = down_obstacle if len(down_obstacle.point['positions']) == 0 else self.filter_radius_outliers(down_obstacle, nb_points=10, search_radius=0.05)[0]
         # rad_filt_navigable, _ = filter_radius_outliers(down_navigable, nb_points=16, search_radius=0.05)
         # rad_filt_canopy, _ = filter_radius_outliers(down_canopy, nb_points=1, search_radius=0.1)
         
@@ -410,35 +432,88 @@ def bev_images_from_foler(src_folder: str, bev_images_folder: str):
             # break
 
 
+# if __name__ == "__main__":
+    
+#     src_folder = "pcd-files/vineyards/"
+#     # bev_images_folder = "bev-images-test"
+    
+    
+#     bev_samples_folder = "bev-demo/bev-samples"
+#     bev_files = os.listdir(bev_samples_folder)
+#     bev_files_ply = [file.replace(".png", ".ply") for file in bev_files]
+#     print(bev_files_ply)
+
+#     file_name = "vineyards_gallo_216.ply"
+    
+#     # os.makedirs(bev_images_folder, exist_ok=True)          
+#     vis = o3d.visualization.Visualizer()
+  
+#     src_path = os.path.join(src_folder, file_name)
+#     pcd_input = o3d.t.io.read_point_cloud(src_path)
+    
+#     bev_voxelizer = BevVoxelizer()
+#     combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
+    
+    
+#     vis.create_window()
+    
+#     # Co-ordinate frame for vis window    
+#     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=4, origin=[0, 0, 0])
+#     vis.add_geometry(coordinate_frame)
+    
+#     # Adding point clouds to visualizer
+#     vis.add_geometry(combined_pcd.to_legacy())
+    
+#     view_ctr = vis.get_view_control()
+#     view_ctr.set_front(np.array([0, -1, 0]))
+#     view_ctr.set_up(np.array([0, 0, 1]))
+#     view_ctr.set_zoom(0.5)
+    
+#     vis.run()
+#     vis.destroy_window()
+
+
+
 if __name__ == "__main__":
     
     src_folder = "pcd-files/vineyards/"
     # bev_images_folder = "bev-images-test"
-    file_name = "vineyards_wente_test_269.ply"
     
-    # os.makedirs(bev_images_folder, exist_ok=True)          
     vis = o3d.visualization.Visualizer()
-  
-    src_path = os.path.join(src_folder, file_name)
-    pcd_input = o3d.t.io.read_point_cloud(src_path)
     
-    bev_voxelizer = BevVoxelizer()
-    combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
+    bev_samples_folder = "bev-demo/bev-samples"
+    bev_files = os.listdir(bev_samples_folder)
     
-    
-    vis.create_window()
-    
-    # Co-ordinate frame for vis window    
-    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1, origin=[0, 0, 0])
-    vis.add_geometry(coordinate_frame)
-    
-    # Adding point clouds to visualizer
-    vis.add_geometry(combined_pcd.to_legacy())
-    
-    view_ctr = vis.get_view_control()
-    view_ctr.set_front(np.array([0, -1, 0]))
-    view_ctr.set_up(np.array([0, 0, 1]))
-    view_ctr.set_zoom(0.5)
-    
-    vis.run()
-    vis.destroy_window()
+    for file in bev_files:
+        try:
+            file_name = file.replace(".png", ".ply")
+            logger.warning(f"=================================")        
+            logger.warning(f"Processing {file_name}")
+            logger.warning(f"=================================\n")
+                    
+            src_path = os.path.join(src_folder, file_name)
+            pcd_input = o3d.t.io.read_point_cloud(src_path)
+            
+            bev_voxelizer = BevVoxelizer()
+            combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
+            
+            
+            vis.create_window()
+            
+            # Co-ordinate frame for vis window    
+            coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
+            vis.add_geometry(coordinate_frame)
+            
+            # Adding point clouds to visualizer
+            vis.add_geometry(combined_pcd.to_legacy())
+            
+            view_ctr = vis.get_view_control()
+            view_ctr.set_front(np.array([0, -1, 0]))
+            view_ctr.set_up(np.array([0, 0, 1]))
+            view_ctr.set_zoom(0.5)
+            
+            vis.run()
+            vis.destroy_window()
+        except Exception as e:
+            logger.error(f"Error processing {file_name}: {e}")
+        # break
