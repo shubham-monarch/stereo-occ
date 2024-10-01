@@ -153,27 +153,30 @@ class BevVoxelizer:
         normal = np.array([a, b, c])
         normal = normal / np.linalg.norm(normal) 
         return normal, inliers
+    
+    def rotation_matrix_to_ypr(self,R):
+        '''
+        Convert rotation matrix to yaw, pitch, roll
+        '''
+        sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
+        singular = sy < 1e-6
+
+        if not singular:
+            yaw = np.arctan2(R[2, 1], R[2, 2])
+            pitch = np.arctan2(-R[2, 0], sy)
+            roll = np.arctan2(R[1, 0], R[0, 0])
+        else:
+            yaw = np.arctan2(-R[1, 2], R[1, 1])
+            pitch = np.arctan2(-R[2, 0], sy)
+            roll = 0
+
+        return np.degrees(yaw), np.degrees(pitch), np.degrees(roll)
 
     def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
         # pcd tilt correction
         R = self.compute_tilt_matrix(pcd_input)
-        # Convert rotation matrix R to yaw, pitch, roll
-        def rotation_matrix_to_ypr(R):
-            sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
-            singular = sy < 1e-6
-
-            if not singular:
-                yaw = np.arctan2(R[2, 1], R[2, 2])
-                pitch = np.arctan2(-R[2, 0], sy)
-                roll = np.arctan2(R[1, 0], R[0, 0])
-            else:
-                yaw = np.arctan2(-R[1, 2], R[1, 1])
-                pitch = np.arctan2(-R[2, 0], sy)
-                roll = 0
-
-            return np.degrees(yaw), np.degrees(pitch), np.degrees(roll)
-
-        yaw, pitch, roll = rotation_matrix_to_ypr(R)
+        
+        yaw, pitch, roll = self.rotation_matrix_to_ypr(R)
 
         logger.warning(f"=================================")    
         logger.warning(f"Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
@@ -183,9 +186,10 @@ class BevVoxelizer:
         normal, _ = self.get_class_plane(pcd_input, self.LABELS["NAVIGABLE_SPACE"]["id"])
         normal_ = np.dot(normal, R.T)
         angles = self.axis_angles(normal_)
+        
         logger.info(f"=================================")    
         logger.info(f"axis_angles: {angles}")
-        logger.info(f"Ground plane makes {angles} degrees with y-axis!")
+        logger.info(f"Ground plane makes {angles} degrees with axes!")
         logger.info(f"=================================\n")
 
         # angle between normal and y-axis should be close to 0 / 180 degrees
