@@ -147,6 +147,7 @@ if __name__ == "__main__":
     bev_samples_folder = "bev-demo/bev-samples"
     bev_files = os.listdir(bev_samples_folder)
     
+    random.shuffle(bev_files)
     for file in bev_files:
         try:
             file_name = file.replace(".png", ".ply")
