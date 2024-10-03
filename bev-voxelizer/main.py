@@ -147,37 +147,36 @@ if __name__ == "__main__":
     bev_samples_folder = "bev-demo/bev-samples"
     bev_files = os.listdir(bev_samples_folder)
     
-    random.shuffle(bev_files)
-    for file in bev_files:
-        try:
-            file_name = file.replace(".png", ".ply")
-            logger.warning(f"=================================")        
-            logger.warning(f"Processing {file_name}")
-            logger.warning(f"=================================\n")
-                    
-            src_path = os.path.join(src_folder, file_name)
-            pcd_input = o3d.t.io.read_point_cloud(src_path)
-            
-            bev_voxelizer = BevVoxelizer()
-            combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
-            
-            
-            vis.create_window()
-            
-            # Co-ordinate frame for vis window    
-            coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
-            vis.add_geometry(coordinate_frame)
-            
-            # Adding point clouds to visualizer
-            vis.add_geometry(combined_pcd.to_legacy())
-            
-            view_ctr = vis.get_view_control()
-            view_ctr.set_front(np.array([0, -1, 0]))
-            view_ctr.set_up(np.array([0, 0, 1]))
-            view_ctr.set_zoom(0.5)
-            
-            vis.run()
-            vis.destroy_window()
-        except Exception as e:
-            logger.error(f"Error processing {file_name}: {e}")
-        # break
+    file = random.choice(bev_files)
+    # file = "vineyards_RJM_124.png"
+    try:
+        file_name = file.replace(".png", ".ply")
+        logger.warning(f"=================================")        
+        logger.warning(f"Processing {file_name}")
+        logger.warning(f"=================================\n")
+                
+        src_path = os.path.join(src_folder, file_name)
+        pcd_input = o3d.t.io.read_point_cloud(src_path)
+        
+        bev_voxelizer = BevVoxelizer()
+        combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
+        
+        
+        vis.create_window()
+        
+        # Co-ordinate frame for vis window    
+        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
+        vis.add_geometry(coordinate_frame)
+        
+        # Adding point clouds to visualizer
+        vis.add_geometry(combined_pcd.to_legacy())
+        
+        view_ctr = vis.get_view_control()
+        view_ctr.set_front(np.array([0, -1, 0]))
+        view_ctr.set_up(np.array([0, 0, 1]))
+        view_ctr.set_zoom(0.5)
+        
+        vis.run()
+        vis.destroy_window()
+    except Exception as e:
+        logger.error(f"Error processing {file_name}: {e}")
