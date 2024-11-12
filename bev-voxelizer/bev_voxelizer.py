@@ -23,7 +23,7 @@ class BevVoxelizer:
             "VINE_CANOPY":     {"id": 3, "priority": 3},
             "VINE_STEM":       {"id": 4, "priority": 4},
             "NAVIGABLE_SPACE": {"id": 2, "priority": 5},
-            "GROUND":          {"id": 0, "priority": 6}
+            "TRACTOR_HOOD":    {"id": 7, "priority": 9999}
         }
     
     def filter_radius_outliers(self, pcd: o3d.t.geometry.PointCloud, nb_points: int, search_radius: float):

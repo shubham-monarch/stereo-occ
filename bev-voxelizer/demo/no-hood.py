@@ -48,7 +48,6 @@ if __name__ == "__main__":
     # Visualizer
     vis = o3d.visualization.Visualizer()
     vis.create_window()
-    
     # Co-ordinate frame for vis window    
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=4, origin=[0, 0, 0])
     vis.add_geometry(coordinate_frame)
@@ -58,23 +57,64 @@ if __name__ == "__main__":
     
     # HOOD [blue] vs NO HOOD [red]
     
-    # ground-plane comparison before tilting
-    ground_pcd_HOOD = pcd_utils.get_class_pointcloud(pcd_HOOD, pcd_utils.LABELS["GROUND"]["id"])
-    ground_pcd_NO_HOOD = pcd_utils.get_class_pointcloud(pcd_NO_HOOD, pcd_utils.LABELS["GROUND"]["id"])
-
-    # visualization
-    ground_pcd_HOOD.paint_uniform_color([0.0, 0.0, 1.0])  # Blue
-    ground_pcd_NO_HOOD.paint_uniform_color([1.0, 0.0, 0.0])  # Red
+    # ================================================
+    # ground-plane comparison [before tilt-correction]
+    # ================================================
     
-    vis.add_geometry(ground_pcd_HOOD.to_legacy())
-    vis.add_geometry(ground_pcd_NO_HOOD.to_legacy())
+    # ground_pcd_HOOD = pcd_utils.get_class_pointcloud(pcd_HOOD, pcd_utils.LABELS["NAVIGABLE_SPACE"]["id"])
+    # ground_pcd_NO_HOOD = pcd_utils.get_class_pointcloud(pcd_NO_HOOD, pcd_utils.LABELS["NAVIGABLE_SPACE"]["id"])
 
-    # ground-plane comparison after tilting
+    # [add to visualizer]
+    # ground_pcd_HOOD.paint_uniform_color([0.0, 0.0, 1.0])  # Blue
+    # ground_pcd_NO_HOOD.paint_uniform_color([1.0, 0.0, 0.0])  # Red
+    
+    # vis.add_geometry(ground_pcd_HOOD.to_legacy())
+    # vis.add_geometry(ground_pcd_NO_HOOD.to_legacy())
 
+    # ================================================
+    # ground-plane comparison [after tilt-correction]
+    # ================================================
+    
+    # R_HOOD = pcd_utils.compute_tilt_matrix(pcd_HOOD)
+    # yaw_HOOD, pitch_HOOD, roll_HOOD = pcd_utils.rotation_matrix_to_ypr(R_HOOD)
+
+    # logger.info(f"=================================")    
+    # logger.info(f"Yaw: {yaw_HOOD:.2f} degrees, Pitch: {pitch_HOOD:.2f} degrees, Roll: {roll_HOOD:.2f} degrees")
+    # logger.info(f"=================================\n")
+
+    # R_NO_HOOD = pcd_utils.compute_tilt_matrix(pcd_NO_HOOD)
+    # yaw_NO_HOOD, pitch_NO_HOOD, roll_NO_HOOD = pcd_utils.rotation_matrix_to_ypr(R_NO_HOOD)
+
+    # logger.info(f"=================================")    
+    # logger.info(f"Yaw: {yaw_NO_HOOD:.2f} degrees, Pitch: {pitch_NO_HOOD:.2f} degrees, Roll: {roll_NO_HOOD:.2f} degrees")
+    # logger.info(f"=================================\n")
+
+    # pcd_HOOD.rotate(R_HOOD, center=(0, 0, 0))
+    # pcd_NO_HOOD.rotate(R_NO_HOOD, center=(0, 0, 0))
+
+    # ground_pcd_HOOD = pcd_utils.get_class_pointcloud(pcd_HOOD, pcd_utils.LABELS["NAVIGABLE_SPACE"]["id"])
+    # ground_pcd_NO_HOOD = pcd_utils.get_class_pointcloud(pcd_NO_HOOD, pcd_utils.LABELS["NAVIGABLE_SPACE"]["id"])
+
+    # # [add to visualizer]
+    # ground_pcd_HOOD.paint_uniform_color([0.0, 0.0, 1.0])  # Blue
+    # ground_pcd_NO_HOOD.paint_uniform_color([1.0, 0.0, 0.0])  # Red
+    
+    # vis.add_geometry(ground_pcd_HOOD.to_legacy())
+    # vis.add_geometry(ground_pcd_NO_HOOD.to_legacy())
+
+    # ================================================
     # tractor-hood points comparison
+    # ================================================
+
+    hood_pcd_HOOD = pcd_utils.get_class_pointcloud(pcd_HOOD, pcd_utils.LABELS["TRACTOR_HOOD"]["id"])
+    hood_pcd_NO_HOOD = pcd_utils.get_class_pointcloud(pcd_NO_HOOD, pcd_utils.LABELS["TRACTOR_HOOD"]["id"])
+
+    # [add to visualizer]
+    hood_pcd_HOOD.paint_uniform_color([0.0, 0.0, 1.0])  # Blue
+    hood_pcd_NO_HOOD.paint_uniform_color([1.0, 0.0, 0.0])  # Red
     
-    
-    # src_path = os.path.join(src_folder, file_name)
+    vis.add_geometry(hood_pcd_HOOD.to_legacy())
+    vis.add_geometry(hood_pcd_NO_HOOD.to_legacy())
 
     
     
@@ -86,9 +126,13 @@ if __name__ == "__main__":
     # Adding point clouds to visualizer
     
     view_ctr = vis.get_view_control()
-    # view_ctr.set_front(np.array([0, -1, 0]))
-    # view_ctr.set_up(np.array([0, 0, 1]))
+    view_ctr.set_front(np.array([0, -1, 0]))
+    view_ctr.set_up(np.array([0, 0, 1]))
     view_ctr.set_zoom(0.5)
+
+
+   
+
     
     vis.run()
     vis.destroy_window()
