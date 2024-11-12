@@ -45,16 +45,17 @@ if __name__ == "__main__":
     pcd_HOOD = o3d.t.io.read_point_cloud(input_path_HOOD)
     pcd_NO_HOOD = o3d.t.io.read_point_cloud(input_path_NO_HOOD)
     
-    # Visualizer
+    # visualizer
     vis = o3d.visualization.Visualizer()
     vis.create_window()
-    # Co-ordinate frame for vis window    
+    
+    # adding co-ordinate frame to visualizer
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=4, origin=[0, 0, 0])
     vis.add_geometry(coordinate_frame)
     
     # PCL utilities class
     pcd_utils = BevVoxelizer()
-    
+
     # HOOD [blue] vs NO HOOD [red]
     
     # ================================================
@@ -106,15 +107,15 @@ if __name__ == "__main__":
     # tractor-hood points comparison
     # ================================================
 
-    hood_pcd_HOOD = pcd_utils.get_class_pointcloud(pcd_HOOD, pcd_utils.LABELS["TRACTOR_HOOD"]["id"])
-    hood_pcd_NO_HOOD = pcd_utils.get_class_pointcloud(pcd_NO_HOOD, pcd_utils.LABELS["TRACTOR_HOOD"]["id"])
+    # hood_pcd_HOOD = pcd_utils.get_class_pointcloud(pcd_HOOD, pcd_utils.LABELS["TRACTOR_HOOD"]["id"])
+    # hood_pcd_NO_HOOD = pcd_utils.get_class_pointcloud(pcd_NO_HOOD, pcd_utils.LABELS["TRACTOR_HOOD"]["id"])
 
-    # [add to visualizer]
-    hood_pcd_HOOD.paint_uniform_color([0.0, 0.0, 1.0])  # Blue
-    hood_pcd_NO_HOOD.paint_uniform_color([1.0, 0.0, 0.0])  # Red
+    # # [add to visualizer]
+    # hood_pcd_HOOD.paint_uniform_color([0.0, 0.0, 1.0])  # Blue
+    # hood_pcd_NO_HOOD.paint_uniform_color([1.0, 0.0, 0.0])  # Red
     
-    vis.add_geometry(hood_pcd_HOOD.to_legacy())
-    vis.add_geometry(hood_pcd_NO_HOOD.to_legacy())
+    # vis.add_geometry(hood_pcd_HOOD.to_legacy())
+    # vis.add_geometry(hood_pcd_NO_HOOD.to_legacy())
 
     
     
@@ -124,7 +125,6 @@ if __name__ == "__main__":
     # VISUALIZER
     
     # Adding point clouds to visualizer
-    
     view_ctr = vis.get_view_control()
     view_ctr.set_front(np.array([0, -1, 0]))
     view_ctr.set_up(np.array([0, 0, 1]))
