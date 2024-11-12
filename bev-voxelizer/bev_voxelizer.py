@@ -18,11 +18,12 @@ class BevVoxelizer:
     def __init__(self):
         
         self.LABELS = {    
-            "OBSTACLE": {"id": 1, "priority": 1},
-            "VINE_POLE": {"id": 5, "priority": 2},  
-            "VINE_CANOPY": {"id": 3, "priority": 3},
-            "VINE_STEM": {"id": 4, "priority": 4},  
-            "NAVIGABLE_SPACE": {"id": 2, "priority": 5},  
+            "OBSTACLE":        {"id": 1, "priority": 1},
+            "VINE_POLE":       {"id": 5, "priority": 2},
+            "VINE_CANOPY":     {"id": 3, "priority": 3},
+            "VINE_STEM":       {"id": 4, "priority": 4},
+            "NAVIGABLE_SPACE": {"id": 2, "priority": 5},
+            "GROUND":          {"id": 0, "priority": 6}
         }
     
     def filter_radius_outliers(self, pcd: o3d.t.geometry.PointCloud, nb_points: int, search_radius: float):
