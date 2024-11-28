@@ -62,15 +62,15 @@ if __name__ == "__main__":
     # ground-plane comparison [before tilt-correction]
     # ================================================
     
-    ground_pcd_HOOD = pcd_utils.get_class_pointcloud(pcd_HOOD, pcd_utils.LABELS["NAVIGABLE_SPACE"]["id"])
-    ground_pcd_NO_HOOD = pcd_utils.get_class_pointcloud(pcd_NO_HOOD, pcd_utils.LABELS["NAVIGABLE_SPACE"]["id"])
+    # ground_pcd_HOOD = pcd_utils.get_class_pointcloud(pcd_HOOD, pcd_utils.LABELS["NAVIGABLE_SPACE"]["id"])
+    # ground_pcd_NO_HOOD = pcd_utils.get_class_pointcloud(pcd_NO_HOOD, pcd_utils.LABELS["NAVIGABLE_SPACE"]["id"])
 
     # [add to visualizer]
-    ground_pcd_HOOD.paint_uniform_color([0.0, 0.0, 1.0])  # Blue
-    ground_pcd_NO_HOOD.paint_uniform_color([1.0, 0.0, 0.0])  # Red
+    # ground_pcd_HOOD.paint_uniform_color([0.0, 0.0, 1.0])  # Blue
+    # ground_pcd_NO_HOOD.paint_uniform_color([1.0, 0.0, 0.0])  # Red
     
-    vis.add_geometry(ground_pcd_HOOD.to_legacy())
-    vis.add_geometry(ground_pcd_NO_HOOD.to_legacy())
+    # vis.add_geometry(ground_pcd_HOOD.to_legacy())
+    # vis.add_geometry(ground_pcd_NO_HOOD.to_legacy())
 
     # ================================================
     # ground-plane comparison [after tilt-correction]

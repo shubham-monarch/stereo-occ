@@ -228,7 +228,8 @@ class BevVoxelizer:
         pcd_stem = self.get_class_pointcloud(pcd_filtered, self.LABELS["VINE_STEM"]["id"])
         pcd_obstacle = self.get_class_pointcloud(pcd_filtered, self.LABELS["OBSTACLE"]["id"])
         pcd_navigable = self.get_class_pointcloud(pcd_filtered, self.LABELS["NAVIGABLE_SPACE"]["id"])
-        
+        pcd_hood = self.get_class_pointcloud(pcd_filtered, self.LABELS["TRACTOR_HOOD"]["id"])
+
         # num-points for each class
         total_points = len(pcd_filtered.point['positions'])
         canopy_points = len(pcd_canopy.point['positions'])
@@ -236,6 +237,7 @@ class BevVoxelizer:
         stem_points = len(pcd_stem.point['positions'])
         obstacle_points = len(pcd_obstacle.point['positions'])
         navigable_points = len(pcd_navigable.point['positions'])
+        hood_points = len(pcd_hood.point['positions'])
 
         # % points for each class
         canopy_percentage = (canopy_points / total_points) * 100
@@ -243,7 +245,8 @@ class BevVoxelizer:
         stem_percentage = (stem_points / total_points) * 100
         obstacle_percentage = (obstacle_points / total_points) * 100
         navigable_percentage = (navigable_points / total_points) * 100
-
+        hood_percentage = (hood_points / total_points) * 100
+        
         logger.info(f"=================================")    
         logger.info(f"Total points: {total_points}")
         logger.info(f"Canopy points: {canopy_points} [{canopy_percentage:.2f}%]")
@@ -251,6 +254,7 @@ class BevVoxelizer:
         logger.info(f"Stem points: {stem_points} [{stem_percentage:.2f}%]")
         logger.info(f"Obstacle points: {obstacle_points} [{obstacle_percentage:.2f}%]")
         logger.info(f"Navigable points: {navigable_points} [{navigable_percentage:.2f}%]")
+        logger.info(f"Hood points: {hood_points} [{hood_percentage:.2f}%]")
         logger.info(f"=================================\n")
 
         # downsampling label-wise pointcloud
