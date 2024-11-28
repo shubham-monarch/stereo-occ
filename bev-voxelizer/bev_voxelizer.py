@@ -201,6 +201,7 @@ class BevVoxelizer:
 
 
         pcd_corrected = pcd_input.clone()
+        # making y-axis perpendicular to the ground plane + right-handed coordinate system
         pcd_corrected.rotate(R, center=(0, 0, 0))
 
         # filtering unwanted labels => [vegetation, tractor-hood, void, sky]
@@ -214,12 +215,12 @@ class BevVoxelizer:
         
         unique_labels = np.unique(pcd_filtered.point['label'].numpy())
         
-        logger.info(f"=================================")    
-        logger.info(f"Before filtering: {original_points}")
-        logger.info(f"After filtering: {filtered_points}")
-        logger.info(f"Reduction %: {reduction_percentage:.2f}%")
-        logger.info(f"Unique labels in pcd_filtered: {unique_labels}")
-        logger.info(f"=================================\n")
+        # logger.info(f"=================================")    
+        # logger.info(f"Before filtering: {original_points}")
+        # logger.info(f"After filtering: {filtered_points}")
+        # logger.info(f"Reduction %: {reduction_percentage:.2f}%")
+        # logger.info(f"Unique labels in pcd_filtered: {unique_labels}")
+        # logger.info(f"=================================\n")
         
         # class-wise point cloud extraction
         pcd_canopy = self.get_class_pointcloud(pcd_filtered, self.LABELS["VINE_CANOPY"]["id"])
@@ -243,14 +244,14 @@ class BevVoxelizer:
         obstacle_percentage = (obstacle_points / total_points) * 100
         navigable_percentage = (navigable_points / total_points) * 100
 
-        logger.info(f"=================================")    
-        logger.info(f"Total points: {total_points}")
-        logger.info(f"Canopy points: {canopy_points} [{canopy_percentage:.2f}%]")
-        logger.info(f"Pole points: {pole_points} [{pole_percentage:.2f}%]")
-        logger.info(f"Stem points: {stem_points} [{stem_percentage:.2f}%]")
-        logger.info(f"Obstacle points: {obstacle_points} [{obstacle_percentage:.2f}%]")
-        logger.info(f"Navigable points: {navigable_points} [{navigable_percentage:.2f}%]")
-        logger.info(f"=================================\n")
+        # logger.info(f"=================================")    
+        # logger.info(f"Total points: {total_points}")
+        # logger.info(f"Canopy points: {canopy_points} [{canopy_percentage:.2f}%]")
+        # logger.info(f"Pole points: {pole_points} [{pole_percentage:.2f}%]")
+        # logger.info(f"Stem points: {stem_points} [{stem_percentage:.2f}%]")
+        # logger.info(f"Obstacle points: {obstacle_points} [{obstacle_percentage:.2f}%]")
+        # logger.info(f"Navigable points: {navigable_points} [{navigable_percentage:.2f}%]")
+        # logger.info(f"=================================\n")
 
         # downsampling label-wise pointcloud
         down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.01)
@@ -332,26 +333,42 @@ class BevVoxelizer:
             normal = -normal
 
         
-        inliers_positions = inliers_navigable.point['positions'].numpy()
-        y_values = inliers_positions[:, 1]
-        mean_y_value = float(np.mean(y_values))
-        logger.info(f"Mean value of Y coordinates: {mean_y_value}")
-        
+        mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
+        logger.info(f"Mean value of Y coordinates: {mean_Y}")
+
+        # shift pcd_navigable so mean_y_value becomes 0
+        shift_vector = np.array([0, -mean_Y, 0], dtype=np.float32)
+        inliers_navigable.point['positions'] = inliers_navigable.point['positions'] + shift_vector
+        logger.info(f"After shifting, mean Y value: {mean_Y}")
+
+        mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
+
+        # Verify mean_Y is close to zero after shifting
+        if not np.isclose(mean_Y, 0, atol=1e-6):
+            logger.error(f"=================================")
+            logger.error(f"Error: mean_Y ({mean_Y}) is not close to zero after shifting!")
+            logger.error(f"=================================\n")
+            exit(1)
+
         # label-wise BEV generations
         bev_navigable = inliers_navigable.clone()
-        bev_navigable.point['positions'][:, 1] = float(mean_y_value)
-        
-        bev_obstacle = rad_filt_obstacle.clone()
-        bev_obstacle.point['positions'][:, 1] = float(mean_y_value) - 0.1
-
-        bev_pole = rad_filt_pole.clone()
-        bev_pole.point['positions'][:, 1] = float(mean_y_value) - 0.09
-
-        bev_stem = rad_filt_stem.clone()
-        bev_stem.point['positions'][:, 1] = float(mean_y_value) - 0.08
+        bev_navigable.point['positions'][:, 1] = float(mean_Y)
         
         bev_canopy = down_canopy.clone()
-        bev_canopy.point['positions'][:, 1] = float(mean_y_value) - 0.07
+        bev_canopy.point['positions'][:, 1] = float(mean_Y) - 0.07
+        # bev_canopy.point['positions'][:, 1] = float(mean_Y)
+
+        bev_stem = rad_filt_stem.clone()
+        bev_stem.point['positions'][:, 1] = float(mean_Y) - 0.08
+        # bev_stem.point['positions'][:, 1] = float(mean_Y)
+        
+        bev_pole = rad_filt_pole.clone()
+        bev_pole.point['positions'][:, 1] = float(mean_Y) - 0.09
+        # bev_pole.point['positions'][:, 1] = float(mean_Y)
+
+        bev_obstacle = rad_filt_obstacle.clone()
+        bev_obstacle.point['positions'][:, 1] = float(mean_Y) - 0.1
+        # bev_obstacle.point['positions'][:, 1] = float(mean_Y)
 
         bev_collection = [inliers_navigable, bev_canopy, bev_pole, bev_stem, bev_obstacle]
         combined_pcd = self.generate_unified_bev_pcd(bev_collection)

@@ -38,26 +38,21 @@ coloredlogs.install(level='INFO', logger=logger, force=True)
 if __name__ == "__main__":
     
     src_folder = "input/pcd-files/vineyards/"
-    # bev_images_folder = "bev-images-test"
     
     vis = o3d.visualization.Visualizer()
     
-    # bev_samples_folder = "bev-demo/bev-samples"
-    # bev_files = os.listdir(bev_samples_folder)
     
     segmented_pcd_folder = "input/bev-pcd/"
     segmented_pcd_folder_files = os.listdir(segmented_pcd_folder)
     
+    # random.seed(0)
     file = random.choice(segmented_pcd_folder_files)
-    # file = "vineyards_RJM_124.png"
     
     try:
-        # file_name = file.replace(".png", ".ply")
         logger.warning(f"=================================")        
         logger.warning(f"Processing {file}")
         logger.warning(f"=================================\n")
                 
-        # src_path = os.path.join(src_folder, file_name)
         pcd_input = o3d.t.io.read_point_cloud(os.path.join(segmented_pcd_folder, file))
         
         bev_voxelizer = BevVoxelizer()
