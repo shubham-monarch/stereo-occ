@@ -179,8 +179,8 @@ class BevVoxelizer:
         yaw, pitch, roll = self.rotation_matrix_to_ypr(R)
 
         logger.warning(f"=================================")    
-        logger.warning(f"Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
-        logger.warning(f"=================================")    
+        logger.warning(f"[BEFORE TILT RECTIFICATION] Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
+        logger.warning(f"=================================\n")    
         
         # sanity check
         normal, _ = self.get_class_plane(pcd_input, self.LABELS["NAVIGABLE_SPACE"]["id"])
@@ -188,8 +188,7 @@ class BevVoxelizer:
         angles = self.axis_angles(normal_)
         
         logger.info(f"=================================")    
-        logger.info(f"axis_angles: {angles}")
-        logger.info(f"Ground plane makes {angles} degrees with axes!")
+        logger.info(f"[AFTER TILT RECTIFICATION] Ground plane makes {angles} degrees with axes!")
         logger.info(f"=================================\n")
 
         # angle between normal and y-axis should be close to 0 / 180 degrees

@@ -37,7 +37,7 @@ coloredlogs.install(level='INFO', logger=logger, force=True)
 
 if __name__ == "__main__":
     
-    src_folder = "input/pcd-files/vineyards/"
+    src_folder = "pcd-files/vineyards/RJM"
     
     vis = o3d.visualization.Visualizer()
     
