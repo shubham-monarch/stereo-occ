@@ -139,24 +139,28 @@ def bev_images_from_foler(src_folder: str, bev_images_folder: str):
 
 if __name__ == "__main__":
     
-    src_folder = "pcd-files/vineyards/"
+    src_folder = "input/pcd-files/vineyards/"
     # bev_images_folder = "bev-images-test"
     
     vis = o3d.visualization.Visualizer()
     
-    bev_samples_folder = "bev-demo/bev-samples"
-    bev_files = os.listdir(bev_samples_folder)
+    # bev_samples_folder = "bev-demo/bev-samples"
+    # bev_files = os.listdir(bev_samples_folder)
     
-    file = random.choice(bev_files)
+    segmented_pcd_folder = "input/bev-pcd/"
+    segmented_pcd_folder_files = os.listdir(segmented_pcd_folder)
+    
+    file = random.choice(segmented_pcd_folder_files)
     # file = "vineyards_RJM_124.png"
+    
     try:
-        file_name = file.replace(".png", ".ply")
+        # file_name = file.replace(".png", ".ply")
         logger.warning(f"=================================")        
-        logger.warning(f"Processing {file_name}")
+        logger.warning(f"Processing {file}")
         logger.warning(f"=================================\n")
                 
-        src_path = os.path.join(src_folder, file_name)
-        pcd_input = o3d.t.io.read_point_cloud(src_path)
+        # src_path = os.path.join(src_folder, file_name)
+        pcd_input = o3d.t.io.read_point_cloud(os.path.join(segmented_pcd_folder, file))
         
         bev_voxelizer = BevVoxelizer()
         combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
@@ -179,4 +183,4 @@ if __name__ == "__main__":
         vis.run()
         vis.destroy_window()
     except Exception as e:
-        logger.error(f"Error processing {file_name}: {e}")
+        logger.error(f"Error processing {file}: {e}")
