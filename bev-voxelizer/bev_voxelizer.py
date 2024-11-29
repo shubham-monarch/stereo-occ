@@ -3,7 +3,10 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d.core as o3c
-
+from scipy.spatial import cKDTree
+from utils import debug_utils
+from typing import List
+    
 
 # LOGGING SETUP
 logger = logging.getLogger(__name__)
@@ -107,6 +110,8 @@ class BevVoxelizer:
         map_to_tensors['label'] = stacked_labels
         map_to_tensors['colors'] = stacked_colors
         
+        
+
         combined_pcd = o3d.t.geometry.PointCloud(map_to_tensors)    
         return combined_pcd
 
@@ -172,6 +177,75 @@ class BevVoxelizer:
 
         return np.degrees(yaw), np.degrees(pitch), np.degrees(roll)
 
+    def clean_around_label(
+        self, 
+        pcd_target: o3d.t.geometry.PointCloud, 
+        pcd_source: o3d.t.geometry.PointCloud, 
+        tolerance: float = 0.02
+    ) -> o3d.t.geometry.PointCloud:
+        
+        '''
+        Remove points in pcd_source that are close to the points in pcd_target
+        '''
+        
+        # Get positions for stem and canopy
+        target_points = pcd_target.point['positions'].numpy()
+        source_points = pcd_source.point['positions'].numpy()
+
+        logger.info(f"len(target_points): {len(target_points)}")
+        logger.info(f"len(source_points): {len(source_points)}")
+
+        # Create arrays of (x,z) coordinates
+        target_xz = target_points[:, [0,2]]  # Get x,z columns
+        source_xz = source_points[:, [0,2]]  # Get x,z columns
+
+        # Create KD-trees for efficient nearest neighbor search
+        target_tree = cKDTree(target_xz)
+        source_tree = cKDTree(source_xz)    
+
+        # Find matches within a tolerance of 0.01
+        tolerance = 0.02
+        matches = []
+
+        to_remove = []
+        for i in range(len(source_xz)):
+            indices = target_tree.query_ball_point(source_xz[i], r=tolerance)
+            if len(indices) > 0:
+                to_remove.append(i)
+        
+        positions = np.delete(pcd_source.point['positions'].numpy(), to_remove, axis=0)
+        labels = np.delete(pcd_source.point['label'].numpy(), to_remove, axis=0)
+        colors = np.delete(pcd_source.point['colors'].numpy(), to_remove, axis=0)
+        
+        # Update bev_navigable with new positions and labels
+        pcd_source.point['positions'] = o3c.Tensor(positions, dtype=o3c.Dtype.Float32)
+        pcd_source.point['label'] = o3c.Tensor(labels, dtype=o3c.Dtype.Int32)
+        pcd_source.point['colors'] = o3c.Tensor(colors, dtype=o3c.Dtype.UInt8)
+
+        logger.info(f"=================================")
+        logger.info(f"Found {len(to_remove)} matches!")
+        logger.info(f"=================================\n")
+
+        return pcd_source
+
+    def clean_around_labels(
+        self, 
+        pcd_target: o3d.t.geometry.PointCloud, 
+        pcd_sources: List[o3d.t.geometry.PointCloud], 
+        tolerance: float = 0.02
+    ) -> List[o3d.t.geometry.PointCloud]:
+        
+        '''
+        Remove points in pcd_sources that are close to the points in pcd_target
+        '''
+        
+        cleaned_pcds = []
+        for pcd in pcd_sources:
+            pcd_cleaned = self.clean_around_label(pcd_target, pcd, tolerance)
+            cleaned_pcds.append(pcd_cleaned)
+        return cleaned_pcds
+    
+
     def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
         # pcd tilt correction
         R = self.compute_tilt_matrix(pcd_input)
@@ -213,13 +287,13 @@ class BevVoxelizer:
         reduction_percentage = ((original_points - filtered_points) / original_points) * 100    
         
         unique_labels = np.unique(pcd_filtered.point['label'].numpy())
-        
-        # logger.info(f"=================================")    
-        # logger.info(f"Before filtering: {original_points}")
-        # logger.info(f"After filtering: {filtered_points}")
-        # logger.info(f"Reduction %: {reduction_percentage:.2f}%")
-        # logger.info(f"Unique labels in pcd_filtered: {unique_labels}")
-        # logger.info(f"=================================\n")
+
+        logger.info(f"=================================")    
+        logger.info(f"Before filtering: {original_points}")
+        logger.info(f"After filtering: {filtered_points}")
+        logger.info(f"Reduction %: {reduction_percentage:.2f}%")
+        logger.info(f"Unique labels in pcd_filtered: {unique_labels}")
+        logger.info(f"=================================\n")
         
         # class-wise point cloud extraction
         pcd_canopy = self.get_class_pointcloud(pcd_filtered, self.LABELS["VINE_CANOPY"]["id"])
@@ -256,6 +330,8 @@ class BevVoxelizer:
         down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.01)
         down_canopy = pcd_canopy.voxel_down_sample(voxel_size=0.01)
         down_navigable = pcd_navigable.voxel_down_sample(voxel_size=0.01)
+        # down_navigable = pcd_navigable
+        
         
         # NOT DOWN-SAMPLING [obstacle, stem, pole]
         down_obstacle = pcd_obstacle.clone()
@@ -333,14 +409,18 @@ class BevVoxelizer:
 
         
         mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
-        logger.info(f"Mean value of Y coordinates: {mean_Y}")
+        logger.warning(f"=================================")    
+        logger.warning(f"[BEFORE SHIFTING] Mean value of Y coordinates: {mean_Y}")
+        logger.warning(f"=================================\n")
 
         # shift pcd_navigable so mean_y_value becomes 0
         shift_vector = np.array([0, -mean_Y, 0], dtype=np.float32)
         inliers_navigable.point['positions'] = inliers_navigable.point['positions'] + shift_vector
-        logger.info(f"After shifting, mean Y value: {mean_Y}")
-
+        
         mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
+        logger.warning(f"=================================")    
+        logger.warning(f"[AFTER SHIFTING] Mean value of Y coordinates: {mean_Y}")
+        logger.warning(f"=================================\n")
 
         # Verify mean_Y is close to zero after shifting
         if not np.isclose(mean_Y, 0, atol=1e-6):
@@ -350,25 +430,37 @@ class BevVoxelizer:
             exit(1)
 
         # label-wise BEV generations
+        # bev_navigable = down_navigable.clone()
         bev_navigable = inliers_navigable.clone()
         bev_navigable.point['positions'][:, 1] = float(mean_Y)
         
         bev_canopy = down_canopy.clone()
-        bev_canopy.point['positions'][:, 1] = float(mean_Y) - 0.07
-        # bev_canopy.point['positions'][:, 1] = float(mean_Y)
+        bev_canopy.point['positions'][:, 1] = float(mean_Y)
 
         bev_stem = rad_filt_stem.clone()
-        bev_stem.point['positions'][:, 1] = float(mean_Y) - 0.08
-        # bev_stem.point['positions'][:, 1] = float(mean_Y)
+        bev_stem.point['positions'][:, 1] = float(mean_Y)
         
         bev_pole = rad_filt_pole.clone()
-        bev_pole.point['positions'][:, 1] = float(mean_Y) - 0.09
-        # bev_pole.point['positions'][:, 1] = float(mean_Y)
+        bev_pole.point['positions'][:, 1] = float(mean_Y)
 
         bev_obstacle = rad_filt_obstacle.clone()
-        bev_obstacle.point['positions'][:, 1] = float(mean_Y) - 0.1
-        # bev_obstacle.point['positions'][:, 1] = float(mean_Y)
+        bev_obstacle.point['positions'][:, 1] = float(mean_Y)
 
-        bev_collection = [inliers_navigable, bev_canopy, bev_pole, bev_stem, bev_obstacle]
+        # cleaning around obstacle
+        [bev_navigable, bev_canopy, bev_stem, bev_pole] = self.clean_around_labels(bev_obstacle, [bev_navigable, bev_canopy, bev_stem, bev_pole], tolerance=0.02)
+        
+        # cleaning around poles
+        [bev_navigable, bev_canopy, bev_stem] = self.clean_around_labels(bev_pole, [bev_navigable, bev_canopy, bev_stem], tolerance=0.02)
+        
+        # cleaning around stem
+        [bev_navigable, bev_canopy] = self.clean_around_labels(bev_stem, [bev_navigable, bev_canopy], tolerance=0.02)
+
+        # cleaning around canopy
+        [bev_navigable] = self.clean_around_labels(bev_canopy, [bev_navigable], tolerance=0.02)
+
+        bev_collection = [bev_obstacle, bev_pole, bev_stem, bev_canopy, bev_navigable]
         combined_pcd = self.generate_unified_bev_pcd(bev_collection)
+
+      
+        
         return combined_pcd

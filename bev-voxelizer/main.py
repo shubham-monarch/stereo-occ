@@ -42,11 +42,12 @@ if __name__ == "__main__":
     vis = o3d.visualization.Visualizer()
     
     
-    segmented_pcd_folder = "input/bev-pcd/"
+    segmented_pcd_folder = "pcd-files/vineyards/RJM"
     segmented_pcd_folder_files = os.listdir(segmented_pcd_folder)
     
     # random.seed(0)
-    file = random.choice(segmented_pcd_folder_files)
+    # file = random.choice(segmented_pcd_folder_files)
+    file  = "vineyards_RJM_15.ply"
     
     try:
         logger.warning(f"=================================")        
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         
         vis.create_window()
         
-        # Co-ordinate frame for vis window    
+        # Co-ordinate frame for vis window      
         coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
         vis.add_geometry(coordinate_frame)
         
@@ -71,7 +72,7 @@ if __name__ == "__main__":
         view_ctr = vis.get_view_control()
         view_ctr.set_front(np.array([0, -1, 0]))
         view_ctr.set_up(np.array([0, 0, 1]))
-        view_ctr.set_zoom(0.5)
+        view_ctr.set_zoom(0.9)
         
         vis.run()
         vis.destroy_window()
