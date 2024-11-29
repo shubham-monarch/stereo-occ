@@ -43,6 +43,10 @@ def plot_bev_scatter(bev_collection: list) -> None:
     plt.grid(True)
     plt.axis('equal')
     
+    # Set range for x and y axis
+    plt.xlim(-5, 5)  # Example range for x-axis
+    plt.ylim(-1, 20)  # Example range for y-axis
+    
     # Save and show the plot
     plt.savefig('bev_distribution.png', dpi=300, bbox_inches='tight')
     plt.show()

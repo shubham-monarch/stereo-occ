@@ -446,21 +446,41 @@ class BevVoxelizer:
         bev_obstacle = rad_filt_obstacle.clone()
         bev_obstacle.point['positions'][:, 1] = float(mean_Y)
 
+        logger.error(f"=================================")    
+        logger.error(f"[BEFORE] len(bev_stem): {len(bev_stem.point['positions'])}")
+        logger.error(f"[BEFORE] len(bev_pole): {len(bev_pole.point['positions'])}")
+        logger.error(f"=================================\n")
+
         # cleaning around obstacle
+        logger.warning(f"Cleaning around OBSTACLE!")
         [bev_navigable, bev_canopy, bev_stem, bev_pole] = self.clean_around_labels(bev_obstacle, [bev_navigable, bev_canopy, bev_stem, bev_pole], tolerance=0.02)
         
+        logger.info(f"[AFTER] len(bev_stem): {len(bev_stem.point['positions'])}")
+        
         # cleaning around poles
-        [bev_navigable, bev_canopy, bev_stem] = self.clean_around_labels(bev_pole, [bev_navigable, bev_canopy, bev_stem], tolerance=0.02)
+        logger.warning(f"Cleaning around POLE!")
+        # [bev_navigable, bev_canopy, bev_stem] = self.clean_around_labels(bev_pole, [bev_navigable, bev_canopy, bev_stem], tolerance=0.02)
+        [bev_navigable, bev_canopy] = self.clean_around_labels(bev_pole, [bev_navigable, bev_canopy], tolerance=0.02)
         
         # cleaning around stem
+        logger.warning(f"Cleaning around STEM!")
         [bev_navigable, bev_canopy] = self.clean_around_labels(bev_stem, [bev_navigable, bev_canopy], tolerance=0.02)
 
         # cleaning around canopy
-        [bev_navigable] = self.clean_around_labels(bev_canopy, [bev_navigable], tolerance=0.02)
+        logger.warning(f"Cleaning around CANOPY!")
+        [bev_navigable] = self.clean_around_labels(bev_canopy, [bev_navigable], tolerance=0.01)
 
-        bev_collection = [bev_obstacle, bev_pole, bev_stem, bev_canopy, bev_navigable]
+        # bev_collection = [bev_obstacle, bev_pole, bev_stem, bev_canopy, bev_navigable]
+        # bev_collection = [bev_obstacle, bev_pole, bev_stem, bev_canopy]
+        bev_collection = [bev_navigable, bev_canopy, bev_pole, bev_stem, bev_obstacle]
         combined_pcd = self.generate_unified_bev_pcd(bev_collection)
 
-      
-        
+        logger.error(f"=================================")    
+        logger.error(f"[AFTER] len(bev_stem): {len(bev_stem.point['positions'])}")
+        logger.error(f"[AFTER] len(bev_pole): {len(bev_pole.point['positions'])}")
+        logger.error(f"=================================\n")
+
+
+        debug_utils.plot_bev_scatter(bev_collection)
+
         return combined_pcd
