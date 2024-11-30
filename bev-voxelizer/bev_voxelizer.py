@@ -245,25 +245,26 @@ class BevVoxelizer:
             cleaned_pcds.append(pcd_cleaned)
         return cleaned_pcds
     
-
-    def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
-        # pcd tilt correction
+    def tilt_rectification(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
+        '''
+        Tilt rectification for the input pointcloud
+        '''
+         # pcd tilt correction
         R = self.compute_tilt_matrix(pcd_input)
-        
+            
         yaw, pitch, roll = self.rotation_matrix_to_ypr(R)
 
-        logger.warning(f"=================================")    
-        logger.warning(f"[BEFORE TILT RECTIFICATION] Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
-        logger.warning(f"=================================\n")    
         
         # sanity check
         normal, _ = self.get_class_plane(pcd_input, self.LABELS["NAVIGABLE_SPACE"]["id"])
         normal_ = np.dot(normal, R.T)
         angles = self.axis_angles(normal_)
+        yaw_, pitch_, roll_ = angles
         
-        logger.info(f"=================================")    
-        logger.info(f"[AFTER TILT RECTIFICATION] Ground plane makes {angles} degrees with axes!")
-        logger.info(f"=================================\n")
+        logger.warning(f"=================================")    
+        logger.warning(f"[BEFORE TILT RECTIFICATION] Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
+        logger.warning(f"[AFTER  TILT RECTIFICATION] Yaw: {yaw_:.2f} degrees, Pitch: {pitch_:.2f} degrees, Roll: {roll_:.2f} degrees")
+        logger.warning(f"=================================\n")
 
         # angle between normal and y-axis should be close to 0 / 180 degrees
         if not np.isclose(angles[1], 0, atol=1) and np.isclose(angles[1], 180, atol=1):
@@ -272,10 +273,15 @@ class BevVoxelizer:
             logger.error(f"=================================\n")
             exit(1)
 
-
         pcd_corrected = pcd_input.clone()
+        
         # making y-axis perpendicular to the ground plane + right-handed coordinate system
         pcd_corrected.rotate(R, center=(0, 0, 0))
+        return pcd_corrected
+    
+    def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
+        
+        pcd_corrected = self.tilt_rectification(pcd_input)
 
         # filtering unwanted labels => [vegetation, tractor-hood, void, sky]
         valid_labels = np.array([label["id"] for label in self.LABELS.values()])
@@ -309,7 +315,7 @@ class BevVoxelizer:
         stem_points = len(pcd_stem.point['positions'])
         obstacle_points = len(pcd_obstacle.point['positions'])
         navigable_points = len(pcd_navigable.point['positions'])
-
+        
         # % points for each class
         canopy_percentage = (canopy_points / total_points) * 100
         pole_percentage = (pole_points / total_points) * 100
@@ -480,6 +486,12 @@ class BevVoxelizer:
         logger.error(f"[AFTER] len(bev_pole): {len(bev_pole.point['positions'])}")
         logger.error(f"=================================\n")
 
+        min_bound = combined_pcd.point['positions'].min(0).numpy()
+        max_bound = combined_pcd.point['positions'].max(0).numpy()
+        
+        logger.info(f"Range of x: {min_bound[0]} to {max_bound[0]}")
+        logger.info(f"Range of y: {min_bound[1]} to {max_bound[1]}")
+        logger.info(f"Range of z: {min_bound[2]} to {max_bound[2]}")
 
         debug_utils.plot_bev_scatter(bev_collection)
 

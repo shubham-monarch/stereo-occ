@@ -47,7 +47,8 @@ if __name__ == "__main__":
     
     # random.seed(0)
     # file = random.choice(segmented_pcd_folder_files)
-    file  = "vineyards_RJM_15.ply"
+    # file  = "vineyards_RJM_15.ply"
+    file = "vineyards_RJM_38.ply"
     
     try:
         logger.warning(f"=================================")        
@@ -58,6 +59,10 @@ if __name__ == "__main__":
         
         bev_voxelizer = BevVoxelizer()
         combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
+
+        # output_file_path = os.path.join(segmented_pcd_folder, "combined_output.ply")
+        o3d.t.io.write_point_cloud("combined_output.ply", combined_pcd)
+        logger.info(f"Saved combined point cloud to combined_output.ply")
         
         
         vis.create_window()

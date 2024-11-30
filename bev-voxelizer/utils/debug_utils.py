@@ -24,28 +24,33 @@ def plot_bev_y_values(bev_point_clouds: list) -> None:
 
 
 def plot_bev_scatter(bev_collection: list) -> None:
-    ''' Create a scatter plot of BEV points (x,z) for each class '''
+    ''' Create a scatter plot of BEV points (x,z) for each class with different scales for x and y axes '''
     
     plt.figure(figsize=(10, 8))
     
     # Plot each BEV class with different colors and labels
-    colors = ['blue', 'green', 'red', 'purple', 'orange']
+    colors = [
+        (48/255, 94/255, 173/255),  # Navigable (BGR: [173, 94, 48])
+        (117/255, 171/255, 68/255), # Canopy (BGR: [68, 171, 117])
+        (148/255, 119/255, 121/255),# Pole (BGR: [121, 119, 148])
+        (174/255, 122/255, 162/255),# Stem (BGR: [162, 122, 174])
+        (228/255, 4/255, 246/255)   # Obstacle (BGR: [246, 4, 228])
+    ]
     labels = ['Navigable', 'Canopy', 'Pole', 'Stem', 'Obstacle']
     
     for bev, color, label in zip(bev_collection, colors, labels):
         positions = bev.point['positions'].numpy()
-        plt.scatter(positions[:, 0], positions[:, 2], c=color, label=label, alpha=0.5, s=1)
+        plt.scatter(positions[:, 0] , positions[:, 2] / 10.0, color=color, label=label, alpha=0.5, s=1)
     
-    plt.xlabel('X (meters)')
-    plt.ylabel('Z (meters)')
+    plt.xlabel('X (centimeters)')
+    plt.ylabel('Z (decameters)')
     plt.title('Bird\'s Eye View Point Distribution')
     plt.legend()
     plt.grid(True)
-    plt.axis('equal')
     
     # Set range for x and y axis
-    plt.xlim(-5, 5)  # Example range for x-axis
-    plt.ylim(-1, 20)  # Example range for y-axis
+    plt.xlim(-30, 30)  # Example range for x-axis in centimeters
+    plt.ylim(0, 20)    # Example range for y-axis in decameters
     
     # Save and show the plot
     plt.savefig('bev_distribution.png', dpi=300, bbox_inches='tight')
