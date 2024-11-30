@@ -328,6 +328,38 @@ class BevVoxelizer:
 
         return bev_pointclouds
 
+    def clean_around_features(
+        self, 
+        bev_obstacle: o3d.t.geometry.PointCloud, 
+        bev_pole: o3d.t.geometry.PointCloud, 
+        bev_stem: o3d.t.geometry.PointCloud, 
+        bev_canopy: o3d.t.geometry.PointCloud, 
+        bev_navigable: o3d.t.geometry.PointCloud
+    ) -> List[o3d.t.geometry.PointCloud]:
+        
+        '''Clean around each label in the BEV pointclouds'''
+
+        # cleaning around obstacle
+        logger.warning(f"Cleaning around OBSTACLE!")
+        [bev_navigable, bev_canopy, bev_stem, bev_pole] = self.clean_around_labels(bev_obstacle, [bev_navigable, bev_canopy, bev_stem, bev_pole], tolerance=0.02)
+        
+        logger.info(f"[AFTER] len(bev_stem): {len(bev_stem.point['positions'])}")
+        
+        # cleaning around poles
+        logger.warning(f"Cleaning around POLE!")
+        [bev_navigable, bev_canopy] = self.clean_around_labels(bev_pole, [bev_navigable, bev_canopy], tolerance=0.02)
+        
+        # cleaning around stem
+        logger.warning(f"Cleaning around STEM!")
+        [bev_navigable, bev_canopy] = self.clean_around_labels(bev_stem, [bev_navigable, bev_canopy], tolerance=0.02)
+
+        # cleaning around canopy
+        logger.warning(f"Cleaning around CANOPY!")
+        [bev_navigable] = self.clean_around_labels(bev_canopy, [bev_navigable], tolerance=0.01)
+
+        return [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
+
+    
     def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
         
         pcd_corrected = self.tilt_rectification(pcd_input)
@@ -446,28 +478,16 @@ class BevVoxelizer:
             )
         )
 
-        # cleaning around obstacle
-        logger.warning(f"Cleaning around OBSTACLE!")
-        [bev_navigable, bev_canopy, bev_stem, bev_pole] = self.clean_around_labels(bev_obstacle, [bev_navigable, bev_canopy, bev_stem, bev_pole], tolerance=0.02)
-        
-        logger.info(f"[AFTER] len(bev_stem): {len(bev_stem.point['positions'])}")
-        
-        # cleaning around poles
-        logger.warning(f"Cleaning around POLE!")
-        # [bev_navigable, bev_canopy, bev_stem] = self.clean_around_labels(bev_pole, [bev_navigable, bev_canopy, bev_stem], tolerance=0.02)
-        [bev_navigable, bev_canopy] = self.clean_around_labels(bev_pole, [bev_navigable, bev_canopy], tolerance=0.02)
-        
-        # cleaning around stem
-        logger.warning(f"Cleaning around STEM!")
-        [bev_navigable, bev_canopy] = self.clean_around_labels(bev_stem, [bev_navigable, bev_canopy], tolerance=0.02)
+        [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle] = self.clean_around_features(
+            bev_obstacle, 
+            bev_pole, 
+            bev_stem, 
+            bev_canopy, 
+            bev_navigable
+        )
 
-        # cleaning around canopy
-        logger.warning(f"Cleaning around CANOPY!")
-        [bev_navigable] = self.clean_around_labels(bev_canopy, [bev_navigable], tolerance=0.01)
+        bev_collection = [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
 
-        # bev_collection = [bev_obstacle, bev_pole, bev_stem, bev_canopy, bev_navigable]
-        # bev_collection = [bev_obstacle, bev_pole, bev_stem, bev_canopy]
-        bev_collection = [bev_navigable, bev_canopy, bev_pole, bev_stem, bev_obstacle]
         combined_pcd = self.generate_unified_bev_pcd(bev_collection)
 
         logger.error(f"=================================")    
