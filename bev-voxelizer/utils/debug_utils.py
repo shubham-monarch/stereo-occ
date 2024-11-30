@@ -40,17 +40,17 @@ def plot_bev_scatter(bev_collection: list) -> None:
     
     for bev, color, label in zip(bev_collection, colors, labels):
         positions = bev.point['positions'].numpy()
-        plt.scatter(positions[:, 0] , positions[:, 2] / 10.0, color=color, label=label, alpha=0.5, s=1)
+        plt.scatter(positions[:, 0] , positions[:, 2] , color=color, label=label, alpha=0.5, s=1)
     
-    plt.xlabel('X (centimeters)')
-    plt.ylabel('Z (decameters)')
+    plt.xlabel('X (meters)')
+    plt.ylabel('Z (meters)')
     plt.title('Bird\'s Eye View Point Distribution')
     plt.legend()
     plt.grid(True)
     
     # Set range for x and y axis
     plt.xlim(-30, 30)  # Example range for x-axis in centimeters
-    plt.ylim(0, 20)    # Example range for y-axis in decameters
+    plt.ylim(0, 80)    # Example range for y-axis in decameters
     
     # Save and show the plot
     plt.savefig('bev_distribution.png', dpi=300, bbox_inches='tight')

@@ -192,9 +192,6 @@ class BevVoxelizer:
         target_points = pcd_target.point['positions'].numpy()
         source_points = pcd_source.point['positions'].numpy()
 
-        logger.info(f"len(target_points): {len(target_points)}")
-        logger.info(f"len(source_points): {len(source_points)}")
-
         # Create arrays of (x,z) coordinates
         target_xz = target_points[:, [0,2]]  # Get x,z columns
         source_xz = source_points[:, [0,2]]  # Get x,z columns
@@ -490,17 +487,14 @@ class BevVoxelizer:
 
         combined_pcd = self.generate_unified_bev_pcd(bev_collection)
 
-        logger.error(f"=================================")    
-        logger.error(f"[AFTER] len(bev_stem): {len(bev_stem.point['positions'])}")
-        logger.error(f"[AFTER] len(bev_pole): {len(bev_pole.point['positions'])}")
-        logger.error(f"=================================\n")
-
         min_bound = combined_pcd.point['positions'].min(0).numpy()
         max_bound = combined_pcd.point['positions'].max(0).numpy()
         
+        logger.info(f"=================================")    
         logger.info(f"Range of x: {min_bound[0]} to {max_bound[0]}")
         logger.info(f"Range of y: {min_bound[1]} to {max_bound[1]}")
         logger.info(f"Range of z: {min_bound[2]} to {max_bound[2]}")
+        logger.info(f"=================================\n")
 
         debug_utils.plot_bev_scatter(bev_collection)
 

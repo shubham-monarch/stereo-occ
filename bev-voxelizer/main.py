@@ -47,8 +47,8 @@ if __name__ == "__main__":
     
     # random.seed(0)
     # file = random.choice(segmented_pcd_folder_files)
-    # file  = "vineyards_RJM_15.ply"
-    file = "vineyards_RJM_38.ply"
+    file  = "vineyards_RJM_15.ply"
+    # file = "vineyards_RJM_38.ply"
     
     try:
         logger.warning(f"=================================")        
