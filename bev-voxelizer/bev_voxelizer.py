@@ -249,12 +249,10 @@ class BevVoxelizer:
         '''
         Tilt rectification for the input pointcloud
         '''
-         # pcd tilt correction
         R = self.compute_tilt_matrix(pcd_input)
             
         yaw, pitch, roll = self.rotation_matrix_to_ypr(R)
 
-        
         # sanity check
         normal, _ = self.get_class_plane(pcd_input, self.LABELS["NAVIGABLE_SPACE"]["id"])
         normal_ = np.dot(normal, R.T)
@@ -279,6 +277,57 @@ class BevVoxelizer:
         pcd_corrected.rotate(R, center=(0, 0, 0))
         return pcd_corrected
     
+    def project_to_ground_plane(
+        self, 
+        pcd_navigable: o3d.t.geometry.PointCloud,
+        additional_pointclouds: List[o3d.t.geometry.PointCloud]
+    ) -> List[o3d.t.geometry.PointCloud]:
+        '''
+        Project the input pointclouds to the navigable plane
+        '''
+        
+        normal, inliers = self.get_class_plane(pcd_navigable, self.LABELS["NAVIGABLE_SPACE"]["id"])
+        normal = normal / np.linalg.norm(normal)
+        inliers_navigable = pcd_navigable.select_by_index(inliers)
+
+        # compute angle with y-axis
+        angle_y = self.axis_angles(normal)[1]
+        logger.info(f"Angle between normal and y-axis: {angle_y:.2f} degrees")
+
+        # align normal with +y-axis if angle with y-axis is negative
+        if angle_y < 0:
+            normal = -normal
+
+        mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
+        logger.warning(f"=================================")    
+        logger.warning(f"[BEFORE SHIFTING] Mean value of Y coordinates: {mean_Y}")
+        logger.warning(f"=================================\n")
+
+        # shift pcd_navigable so mean_y_value becomes 0
+        shift_vector = np.array([0, -mean_Y, 0], dtype=np.float32)
+        inliers_navigable.point['positions'] = inliers_navigable.point['positions'] + shift_vector
+        
+        mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
+        logger.warning(f"=================================")    
+        logger.warning(f"[AFTER SHIFTING] Mean value of Y coordinates: {mean_Y}")
+        logger.warning(f"=================================\n")
+
+        # Verify mean_Y is close to zero after shifting
+        if not np.isclose(mean_Y, 0, atol=1e-6):
+            logger.error(f"=================================")
+            logger.error(f"Error: mean_Y ({mean_Y}) is not close to zero after shifting!")
+            logger.error(f"=================================\n")
+            exit(1)
+
+        # label-wise BEV generations
+        bev_pointclouds = []
+        for pcd in (pcd_navigable, *additional_pointclouds):
+            bev_pcd = pcd.clone()
+            bev_pcd.point['positions'][:, 1] = float(mean_Y)
+            bev_pointclouds.append(bev_pcd)
+
+        return bev_pointclouds
+
     def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
         
         pcd_corrected = self.tilt_rectification(pcd_input)
@@ -336,9 +385,7 @@ class BevVoxelizer:
         down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.01)
         down_canopy = pcd_canopy.voxel_down_sample(voxel_size=0.01)
         down_navigable = pcd_navigable.voxel_down_sample(voxel_size=0.01)
-        # down_navigable = pcd_navigable
-        
-        
+          
         # NOT DOWN-SAMPLING [obstacle, stem, pole]
         down_obstacle = pcd_obstacle.clone()
         down_stem = pcd_stem.clone()
@@ -371,91 +418,33 @@ class BevVoxelizer:
         # radius-based outlier removal
         rad_filt_pole = down_pole if len(down_pole.point['positions']) == 0 else self.filter_radius_outliers(down_pole, nb_points=16, search_radius=0.05)[0]
         rad_filt_stem = down_stem if len(down_stem.point['positions']) == 0 else self.filter_radius_outliers(down_stem, nb_points=16, search_radius=0.05)[0]
-        # rad_filt_obstacle = down_obstacle if len(down_obstacle.point['positions']) == 0 else self.filter_radius_outliers(down_obstacle, nb_points=16, search_radius=0.05)[0]
         rad_filt_obstacle = down_obstacle if len(down_obstacle.point['positions']) == 0 else self.filter_radius_outliers(down_obstacle, nb_points=10, search_radius=0.05)[0]
-        # rad_filt_navigable, _ = filter_radius_outliers(down_navigable, nb_points=16, search_radius=0.05)
-        # rad_filt_canopy, _ = filter_radius_outliers(down_canopy, nb_points=1, search_radius=0.1)
         
         rad_filt_pole_points = len(rad_filt_pole.point['positions'].numpy())
         rad_filt_stem_points = len(rad_filt_stem.point['positions'].numpy())
         rad_filt_obstacle_points = len(rad_filt_obstacle.point['positions'].numpy())
-        # rad_filt_navigable_points = len(rad_filt_navigable.point['positions'].numpy())
-        # rad_filt_canopy_points = len(rad_filt_canopy.point['positions'].numpy())
         
         pole_reduction_pct = (down_pole_points - rad_filt_pole_points) / down_pole_points * 100 if down_pole_points != 0 else 0
         stem_reduction_pct = (down_stem_points - rad_filt_stem_points) / down_stem_points * 100 if down_stem_points != 0 else 0
         obstacle_reduction_pct = (down_obstacle_points - rad_filt_obstacle_points) / down_obstacle_points * 100 if down_obstacle_points != 0 else 0
-        # navigable_reduction_pct = (down_navigable_points - rad_filt_navigable_points) / down_navigable_points * 100 if down_navigable_points != 0 else 0
-        # canopy_reduction_pct = (down_canopy_points - rad_filt_canopy_points) / down_canopy_points * 100
         
         logger.info(f"=================================")    
         logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
         logger.info(f"Pole points: {rad_filt_pole_points} [-{pole_reduction_pct:.2f}%]")
         logger.info(f"Stem points: {rad_filt_stem_points} [-{stem_reduction_pct:.2f}%]")
         logger.info(f"Obstacle points: {rad_filt_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
-        # logger.info(f"Canopy points: {rad_filt_canopy_points} [-{canopy_reduction_pct:.2f}%]")
-        # logger.info(f"Navigable points: {rad_filt_navigable_points} [-{navigable_reduction_pct:.2f}%]")
         logger.info(f"=================================\n")
 
-        
-        # projecting points to the navigable plane
-        normal, inliers = self.get_class_plane(pcd_navigable, self.LABELS["NAVIGABLE_SPACE"]["id"])
-        normal = normal / np.linalg.norm(normal)
-        inliers_navigable = pcd_navigable.select_by_index(inliers)
-
-        # self.plot_plane_histogram(inliers_navigable)
-        
-        # compute angle with y-axis
-        angle_y = self.axis_angles(normal)[1]
-        logger.info(f"Angle between normal and y-axis: {angle_y:.2f} degrees")
-
-        # align normal with +y-axis if angle with y-axis is negative
-        if angle_y < 0:
-            normal = -normal
-
-        
-        mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
-        logger.warning(f"=================================")    
-        logger.warning(f"[BEFORE SHIFTING] Mean value of Y coordinates: {mean_Y}")
-        logger.warning(f"=================================\n")
-
-        # shift pcd_navigable so mean_y_value becomes 0
-        shift_vector = np.array([0, -mean_Y, 0], dtype=np.float32)
-        inliers_navigable.point['positions'] = inliers_navigable.point['positions'] + shift_vector
-        
-        mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
-        logger.warning(f"=================================")    
-        logger.warning(f"[AFTER SHIFTING] Mean value of Y coordinates: {mean_Y}")
-        logger.warning(f"=================================\n")
-
-        # Verify mean_Y is close to zero after shifting
-        if not np.isclose(mean_Y, 0, atol=1e-6):
-            logger.error(f"=================================")
-            logger.error(f"Error: mean_Y ({mean_Y}) is not close to zero after shifting!")
-            logger.error(f"=================================\n")
-            exit(1)
-
-        # label-wise BEV generations
-        # bev_navigable = down_navigable.clone()
-        bev_navigable = inliers_navigable.clone()
-        bev_navigable.point['positions'][:, 1] = float(mean_Y)
-        
-        bev_canopy = down_canopy.clone()
-        bev_canopy.point['positions'][:, 1] = float(mean_Y)
-
-        bev_stem = rad_filt_stem.clone()
-        bev_stem.point['positions'][:, 1] = float(mean_Y)
-        
-        bev_pole = rad_filt_pole.clone()
-        bev_pole.point['positions'][:, 1] = float(mean_Y)
-
-        bev_obstacle = rad_filt_obstacle.clone()
-        bev_obstacle.point['positions'][:, 1] = float(mean_Y)
-
-        logger.error(f"=================================")    
-        logger.error(f"[BEFORE] len(bev_stem): {len(bev_stem.point['positions'])}")
-        logger.error(f"[BEFORE] len(bev_pole): {len(bev_pole.point['positions'])}")
-        logger.error(f"=================================\n")
+        # projecting to ground plane
+        bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle = (
+            self.project_to_ground_plane(
+                pcd_navigable, 
+                [down_canopy, 
+                rad_filt_stem, 
+                rad_filt_pole, 
+                rad_filt_obstacle]
+            )
+        )
 
         # cleaning around obstacle
         logger.warning(f"Cleaning around OBSTACLE!")
