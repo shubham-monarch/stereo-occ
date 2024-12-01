@@ -256,10 +256,10 @@ class BevVoxelizer:
         angles = self.axis_angles(normal_)
         yaw_, pitch_, roll_ = angles
         
-        logger.warning(f"=================================")    
-        logger.warning(f"[BEFORE TILT RECTIFICATION] Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
-        logger.warning(f"[AFTER  TILT RECTIFICATION] Yaw: {yaw_:.2f} degrees, Pitch: {pitch_:.2f} degrees, Roll: {roll_:.2f} degrees")
-        logger.warning(f"=================================\n")
+        # logger.warning(f"=================================")    
+        # logger.warning(f"[BEFORE TILT RECTIFICATION] Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
+        # logger.warning(f"[AFTER  TILT RECTIFICATION] Yaw: {yaw_:.2f} degrees, Pitch: {pitch_:.2f} degrees, Roll: {roll_:.2f} degrees")
+        # logger.warning(f"=================================\n")
 
         # angle between normal and y-axis should be close to 0 / 180 degrees
         if not np.isclose(angles[1], 0, atol=1) and np.isclose(angles[1], 180, atol=1):
@@ -488,6 +488,6 @@ class BevVoxelizer:
         combined_pcd = self.generate_unified_bev_pcd(bev_collection)
 
 
-        debug_utils.plot_bev_scatter(bev_collection)
+        # debug_utils.plot_bev_scatter(bev_collection)
 
         return combined_pcd

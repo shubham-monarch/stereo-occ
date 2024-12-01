@@ -5,6 +5,9 @@ import os
 import random
 import numpy as np
 import cv2
+import shutil
+from tqdm import tqdm
+
 from bev_voxelizer import BevVoxelizer
 from utils.log_utils import get_logger
 
@@ -69,27 +72,32 @@ if __name__ == "__main__":
     
     segmented_pcd_folders = list_base_folders(segmented_pcd_dir)
     
-    random_folder = random.choice(segmented_pcd_folders)
-    # random_folder = "/home/skumar/ssd/2024_06_06_utc/svo_files/front_2024-06-05-09-43-13.svo/246_to_388/frame-378" 
-    
-    logger.info(f"=================================")
-    logger.info(f"Processing {random_folder}")
-    logger.info(f"=================================\n")
-    
-    random_pcd_file = os.path.join(random_folder, "left-segmented-labelled.ply")
 
-    bev_image = pcd_to_bev(random_pcd_file)
-    
-    output_path = os.path.join(random_folder, "bev_image.png")
-    cv2.imwrite(output_path, bev_image)
-    
-    logger.info(f"Saved BEV image to {output_path}")
+    for i in tqdm(range(200), desc="Processing folders"):
+        try:
+            random_folder = random.choice(segmented_pcd_folders)
+            
+            with open("logs/processing_log.txt", "a") as log_file:
+                log_file.write("=================================\n")
+                log_file.write(f"Processing {random_folder}\n")
+                log_file.write("=================================\n")
+            
+            random_pcd_file = os.path.join(random_folder, "left-segmented-labelled.ply")
 
-    # cv2.imshow("BEV Image", bev_image)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+            bev_image = pcd_to_bev(random_pcd_file)
+            
+            output_path = os.path.join(random_folder, "bev_image.png")
+            cv2.imwrite(output_path, bev_image)
 
-    # cv2.imwrite("bev_image.png", bev_image)
+            destination_folder = os.path.join(segmented_bev_dir, str(i))
+            shutil.copytree(random_folder, destination_folder)
 
+            with open("logs/processing_log.txt", "a") as log_file:
+                log_file.write(f"Saved BEV image to {output_path}\n")
+                log_file.write(f"Copied {random_folder} to {destination_folder}\n")
+                log_file.write("=================================\n")
+
+        except Exception as e:
+            logger.error(f"Error processing folder {random_folder}: {e}")
 
    
