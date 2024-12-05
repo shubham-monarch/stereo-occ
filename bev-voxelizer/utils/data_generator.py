@@ -116,10 +116,14 @@ def pcd_to_segmentation_mask_mono(
     # 4: Vine Stem
     # 5: Vine Pole
 
+    # # Fill mask with label values
+    # for x, z, label in zip(x_scaled, z_scaled, labels):
+    #     if 1 <= label <= 5:  # Only use valid label values
+    #         mask[z, x] = label
+
     # Fill mask with label values
     for x, z, label in zip(x_scaled, z_scaled, labels):
-        if 1 <= label <= 5:  # Only use valid label values
-            mask[z, x] = label
+        mask[H - z - 1, x] = label  # Invert z to match image coordinates
 
     return mask
 
