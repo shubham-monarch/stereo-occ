@@ -11,6 +11,8 @@ from tqdm import tqdm
 from bev_voxelizer import BevVoxelizer
 from utils.log_utils import get_logger
 
+logger = get_logger("data_generator")
+
 def list_base_folders(folder_path):
     base_folders = []
     for root, dirs, files in os.walk(folder_path):
@@ -18,22 +20,38 @@ def list_base_folders(folder_path):
             base_folders.append(os.path.join(root, dir_name))
     return base_folders
 
+
+def count_unique_labels(mask_img: np.ndarray):
+    """Count and return the number of unique labels in a segmented RGB mask image."""
+    
+    # Convert RGB to single integer for each unique color
+    mask_flat = mask_img.reshape(-1, 3)
+    unique_colors = np.unique(mask_flat, axis=0)
+    
+    logger.info(f"=================================")
+    logger.info(f"Number of unique labels: {len(unique_colors)}")
+    logger.info(f"Unique RGB values:")
+    for color in unique_colors:
+        logger.info(f"  RGB: {color}")
+    logger.info(f"=================================\n")
+    
+    return len(unique_colors), unique_colors
+
+
 def pcd_to_bev(
-    pcd_path: str,  
+    pcd: o3d.t.geometry.PointCloud,  
     H: int = 480, 
     W: int = 640
 ) -> np.ndarray:
 
     '''Convert a 3D PCD => BEV => (H, W, 3) numpy array'''
-
-    pcd_3D = o3d.t.io.read_point_cloud(pcd_path)
     
-    bev_voxelizer = BevVoxelizer()
-    pcd_BEV = bev_voxelizer.generate_bev_voxels(pcd_3D)
+    # bev_voxelizer = BevVoxelizer()
+    # pcd_BEV = bev_voxelizer.generate_bev_voxels(pcd)
 
-    x_coords = pcd_BEV.point['positions'][:, 0].numpy()
-    z_coords = pcd_BEV.point['positions'][:, 2].numpy()
-    colors = pcd_BEV.point['colors'].numpy()  # Assuming colors are in [0, 1] range
+    x_coords = pcd.point['positions'][:, 0].numpy()
+    z_coords = pcd.point['positions'][:, 2].numpy()
+    colors = pcd.point['colors'].numpy()  # Assuming colors are in [0, 1] range
 
     # cropping bev points to a 20m x 10m area
     valid_indices = np.where(
@@ -62,6 +80,53 @@ def pcd_to_bev(
         image_BEV[H - z - 1, x] = color  # Invert z to match image coordinates
 
     return image_BEV
+
+# def pcd_to_bev(
+#     pcd_path: str,  
+#     H: int = 480, 
+#     W: int = 640
+# ) -> np.ndarray:
+
+#     '''Convert a 3D PCD => BEV => (H, W, 3) numpy array'''
+
+#     pcd_3D = o3d.t.io.read_point_cloud(pcd_path)
+    
+#     bev_voxelizer = BevVoxelizer()
+#     pcd_BEV = bev_voxelizer.generate_bev_voxels(pcd_3D)
+
+#     x_coords = pcd_BEV.point['positions'][:, 0].numpy()
+#     z_coords = pcd_BEV.point['positions'][:, 2].numpy()
+#     colors = pcd_BEV.point['colors'].numpy()  # Assuming colors are in [0, 1] range
+
+    
+
+#     # cropping bev points to a 20m x 10m area
+#     valid_indices = np.where(
+#         (x_coords >= -10) & (x_coords <= 10) & 
+#         (z_coords >= 0) & (z_coords <= 20)
+#     )[0]
+
+#     x_coords = x_coords[valid_indices]
+#     z_coords = z_coords[valid_indices]
+#     colors = colors[valid_indices]
+
+#     x_min, x_max = x_coords.min(), x_coords.max()
+#     z_min, z_max = z_coords.min(), z_coords.max()
+
+#     x_scaled = ((x_coords - x_min) / (x_max - x_min) * (W - 1)).astype(np.int32)
+#     z_scaled = ((z_coords - z_min) / (z_max - z_min) * (H - 1)).astype(np.int32)
+
+#     # rgb to bgr
+#     colors_bgr = colors[:, [2, 1, 0]]
+
+#     # Create a blank color image
+#     image_BEV = np.zeros((H, W, 3), dtype=np.uint8)
+
+#     # Plot the points on the image with their original colors
+#     for x, z, color in zip(x_scaled, z_scaled, colors_bgr):
+#         image_BEV[H - z - 1, x] = color  # Invert z to match image coordinates
+
+#     return image_BEV
 
 
 if __name__ == "__main__":

@@ -1,12 +1,22 @@
-import logging, coloredlogs
+import logging
+import sys
+import coloredlogs
 
-
-def get_logger():
-    logger = logging.getLogger(__name__)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(lineno)d')
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    coloredlogs.install(level='INFO', logger=logger, force=True)
+def get_logger(name, level=logging.INFO):
+    '''Get a logger with colored output'''
     
-    return logger
+    logging.basicConfig(level=level)
+    logger = logging.getLogger(name)
+    logger.propagate = False
+    formatter = logging.Formatter(
+        fmt="%(asctime)s %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
+    )
+    consoleHandler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+        fmt="\x1b[32m%(asctime)s\x1b[0m %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
+    )
+    consoleHandler.setFormatter(formatter)
+    logger.handlers = [consoleHandler]
+    coloredlogs.install(level=level, logger=logger, force=True)
+
+    return logger    

@@ -6,16 +6,7 @@ import open3d.core as o3c
 from scipy.spatial import cKDTree
 from utils import debug_utils
 from typing import List
-    
-
-# LOGGING SETUP
-logger = logging.getLogger(__name__)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(lineno)d')
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-coloredlogs.install(level='INFO', logger=logger, force=True)
-
+from utils.log_utils import get_logger
 
 class BevVoxelizer:
     def __init__(self):
@@ -27,6 +18,8 @@ class BevVoxelizer:
             "VINE_STEM": {"id": 4, "priority": 4},  
             "NAVIGABLE_SPACE": {"id": 2, "priority": 5},  
         }
+
+        self.logger = get_logger("bev_voxelizer")
     
     def filter_radius_outliers(self, pcd: o3d.t.geometry.PointCloud, nb_points: int, search_radius: float):
         '''
@@ -219,9 +212,9 @@ class BevVoxelizer:
         pcd_source.point['label'] = o3c.Tensor(labels, dtype=o3c.Dtype.Int32)
         pcd_source.point['colors'] = o3c.Tensor(colors, dtype=o3c.Dtype.UInt8)
 
-        # logger.info(f"=================================")
-        # logger.info(f"Found {len(to_remove)} matches!")
-        # logger.info(f"=================================\n")
+        # self.logger.info(f"=================================")
+        # self.logger.info(f"Found {len(to_remove)} matches!")
+        # self.logger.info(f"=================================\n")
 
         return pcd_source
 
@@ -256,16 +249,16 @@ class BevVoxelizer:
         angles = self.axis_angles(normal_)
         yaw_, pitch_, roll_ = angles
         
-        # logger.warning(f"=================================")    
-        # logger.warning(f"[BEFORE TILT RECTIFICATION] Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
-        # logger.warning(f"[AFTER  TILT RECTIFICATION] Yaw: {yaw_:.2f} degrees, Pitch: {pitch_:.2f} degrees, Roll: {roll_:.2f} degrees")
-        # logger.warning(f"=================================\n")
+        self.logger.warning(f"=================================")    
+        self.logger.warning(f"[BEFORE TILT RECTIFICATION] Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
+        self.logger.warning(f"[AFTER  TILT RECTIFICATION] Yaw: {yaw_:.2f} degrees, Pitch: {pitch_:.2f} degrees, Roll: {roll_:.2f} degrees")
+        self.logger.warning(f"=================================\n")
 
         # angle between normal and y-axis should be close to 0 / 180 degrees
         if not np.isclose(angles[1], 0, atol=1) and np.isclose(angles[1], 180, atol=1):
-            logger.error(f"=================================")    
-            logger.error(f"Error: angles_transformed[1] is {angles[1]}, but it should be close to 0 degrees. Please check the tilt correction!")
-            logger.error(f"=================================\n")
+            self.logger.error(f"=================================")    
+            self.logger.error(f"Error: angles_transformed[1] is {angles[1]}, but it should be close to 0 degrees. Please check the tilt correction!")
+            self.logger.error(f"=================================\n")
             exit(1)
 
         pcd_corrected = pcd_input.clone()
@@ -289,31 +282,31 @@ class BevVoxelizer:
 
         # compute angle with y-axis
         angle_y = self.axis_angles(normal)[1]
-        # logger.info(f"Angle between normal and y-axis: {angle_y:.2f} degrees")
+        # self.logger.info(f"Angle between normal and y-axis: {angle_y:.2f} degrees")
 
         # align normal with +y-axis if angle with y-axis is negative
         if angle_y < 0:
             normal = -normal
 
         mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
-        # logger.warning(f"=================================")    
-        # logger.warning(f"[BEFORE SHIFTING] Mean value of Y coordinates: {mean_Y}")
-        # logger.warning(f"=================================\n")
+        self.logger.warning(f"=================================")    
+        self.logger.warning(f"[BEFORE SHIFTING] Mean value of Y coordinates: {mean_Y}")
+        self.logger.warning(f"=================================\n")
 
         # shift pcd_navigable so mean_y_value becomes 0
         shift_vector = np.array([0, -mean_Y, 0], dtype=np.float32)
         inliers_navigable.point['positions'] = inliers_navigable.point['positions'] + shift_vector
         
         mean_Y = float(np.mean(inliers_navigable.point['positions'].numpy()[:, 1]))
-        # logger.warning(f"=================================")    
-        # logger.warning(f"[AFTER SHIFTING] Mean value of Y coordinates: {mean_Y}")
-        # logger.warning(f"=================================\n")
+        self.logger.warning(f"=================================")    
+        self.logger.warning(f"[AFTER SHIFTING] Mean value of Y coordinates: {mean_Y}")
+        self.logger.warning(f"=================================\n")
 
         # Verify mean_Y is close to zero after shifting
         if not np.isclose(mean_Y, 0, atol=1e-6):
-            logger.error(f"=================================")
-            logger.error(f"Error: mean_Y ({mean_Y}) is not close to zero after shifting!")
-            logger.error(f"=================================\n")
+            self.logger.error(f"=================================")
+            self.logger.error(f"Error: mean_Y ({mean_Y}) is not close to zero after shifting!")
+            self.logger.error(f"=================================\n")
             exit(1)
 
         # label-wise BEV generations
@@ -337,21 +330,21 @@ class BevVoxelizer:
         '''Clean around each label in the BEV pointclouds'''
 
         # cleaning around obstacle
-        # logger.warning(f"Cleaning around OBSTACLE!")
+        # self.logger.warning(f"Cleaning around OBSTACLE!")
         [bev_navigable, bev_canopy, bev_stem, bev_pole] = self.clean_around_labels(bev_obstacle, [bev_navigable, bev_canopy, bev_stem, bev_pole], tolerance=0.02)
         
-        # logger.info(f"[AFTER] len(bev_stem): {len(bev_stem.point['positions'])}")
+        # self.logger.info(f"[AFTER] len(bev_stem): {len(bev_stem.point['positions'])}")
         
         # cleaning around poles
-        # logger.warning(f"Cleaning around POLE!")
+        # self.logger.warning(f"Cleaning around POLE!")
         [bev_navigable, bev_canopy] = self.clean_around_labels(bev_pole, [bev_navigable, bev_canopy], tolerance=0.02)
         
         # cleaning around stem
-        # logger.warning(f"Cleaning around STEM!")
+        # self.logger.warning(f"Cleaning around STEM!")
         [bev_navigable, bev_canopy] = self.clean_around_labels(bev_stem, [bev_navigable, bev_canopy], tolerance=0.02)
 
         # cleaning around canopy
-        # logger.warning(f"Cleaning around CANOPY!")
+        # self.logger.warning(f"Cleaning around CANOPY!")
         [bev_navigable] = self.clean_around_labels(bev_canopy, [bev_navigable], tolerance=0.01)
 
         return [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
@@ -372,12 +365,12 @@ class BevVoxelizer:
         
         unique_labels = np.unique(pcd_filtered.point['label'].numpy())
 
-        # logger.info(f"=================================")    
-        # logger.info(f"Before filtering: {original_points}")
-        # logger.info(f"After filtering: {filtered_points}")
-        # logger.info(f"Reduction %: {reduction_percentage:.2f}%")
-        # logger.info(f"Unique labels in pcd_filtered: {unique_labels}")
-        # logger.info(f"=================================\n")
+        self.logger.info(f"=================================")    
+        self.logger.info(f"Before filtering: {original_points}")
+        self.logger.info(f"After filtering: {filtered_points}")
+        self.logger.info(f"Reduction %: {reduction_percentage:.2f}%")
+        self.logger.info(f"Unique labels in pcd_filtered: {unique_labels}")
+        self.logger.info(f"=================================\n")
         
         # class-wise point cloud extraction
         pcd_canopy = self.get_class_pointcloud(pcd_filtered, self.LABELS["VINE_CANOPY"]["id"])
@@ -401,14 +394,14 @@ class BevVoxelizer:
         obstacle_percentage = (obstacle_points / total_points) * 100
         navigable_percentage = (navigable_points / total_points) * 100
 
-        # logger.info(f"=================================")    
-        # logger.info(f"Total points: {total_points}")
-        # logger.info(f"Canopy points: {canopy_points} [{canopy_percentage:.2f}%]")
-        # logger.info(f"Pole points: {pole_points} [{pole_percentage:.2f}%]")
-        # logger.info(f"Stem points: {stem_points} [{stem_percentage:.2f}%]")
-        # logger.info(f"Obstacle points: {obstacle_points} [{obstacle_percentage:.2f}%]")
-        # logger.info(f"Navigable points: {navigable_points} [{navigable_percentage:.2f}%]")
-        # logger.info(f"=================================\n")
+        self.logger.info(f"=================================")    
+        self.logger.info(f"Total points: {total_points}")
+        self.logger.info(f"Canopy points: {canopy_points} [{canopy_percentage:.2f}%]")
+        self.logger.info(f"Pole points: {pole_points} [{pole_percentage:.2f}%]")
+        self.logger.info(f"Stem points: {stem_points} [{stem_percentage:.2f}%]")
+        self.logger.info(f"Obstacle points: {obstacle_points} [{obstacle_percentage:.2f}%]")
+        self.logger.info(f"Navigable points: {navigable_points} [{navigable_percentage:.2f}%]")
+        self.logger.info(f"=================================\n")
 
         # downsampling label-wise pointcloud
         down_pcd = pcd_filtered.voxel_down_sample(voxel_size=0.01)
@@ -434,15 +427,15 @@ class BevVoxelizer:
         obstacle_reduction_pct = (obstacle_points - down_obstacle_points) / obstacle_points * 100 if obstacle_points != 0 else 0
         navigable_reduction_pct = (navigable_points - down_navigable_points) / navigable_points * 100 if navigable_points != 0 else 0
         
-        # logger.info(f"=================================")    
-        # logger.info(f"[AFTER DOWNSAMPLING]")
-        # logger.info(f"Total points: {down_total_points} [-{total_reduction_pct:.2f}%]")
-        # logger.info(f"Canopy points: {down_canopy_points} [-{canopy_reduction_pct:.2f}%]")
-        # logger.info(f"Pole points: {down_pole_points} [-{pole_reduction_pct:.2f}%]")
-        # logger.info(f"Stem points: {down_stem_points} [-{stem_reduction_pct:.2f}%]")
-        # logger.info(f"Obstacle points: {down_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
-        # logger.info(f"Navigable points: {down_navigable_points} [-{navigable_reduction_pct:.2f}%]")
-        # logger.info(f"=================================\n")
+        # self.logger.info(f"=================================")    
+        # self.logger.info(f"[AFTER DOWNSAMPLING]")
+        # self.logger.info(f"Total points: {down_total_points} [-{total_reduction_pct:.2f}%]")
+        # self.logger.info(f"Canopy points: {down_canopy_points} [-{canopy_reduction_pct:.2f}%]")
+        # self.logger.info(f"Pole points: {down_pole_points} [-{pole_reduction_pct:.2f}%]")
+        # self.logger.info(f"Stem points: {down_stem_points} [-{stem_reduction_pct:.2f}%]")
+        # self.logger.info(f"Obstacle points: {down_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
+        # self.logger.info(f"Navigable points: {down_navigable_points} [-{navigable_reduction_pct:.2f}%]")
+        # self.logger.info(f"=================================\n")
         
         # radius-based outlier removal
         rad_filt_pole = down_pole if len(down_pole.point['positions']) == 0 else self.filter_radius_outliers(down_pole, nb_points=16, search_radius=0.05)[0]
@@ -457,36 +450,51 @@ class BevVoxelizer:
         stem_reduction_pct = (down_stem_points - rad_filt_stem_points) / down_stem_points * 100 if down_stem_points != 0 else 0
         obstacle_reduction_pct = (down_obstacle_points - rad_filt_obstacle_points) / down_obstacle_points * 100 if down_obstacle_points != 0 else 0
         
-        # logger.info(f"=================================")    
-        # logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
-        # logger.info(f"Pole points: {rad_filt_pole_points} [-{pole_reduction_pct:.2f}%]")
-        # logger.info(f"Stem points: {rad_filt_stem_points} [-{stem_reduction_pct:.2f}%]")
-        # logger.info(f"Obstacle points: {rad_filt_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
-        # logger.info(f"=================================\n")
+        # self.logger.info(f"=================================")    
+        # self.logger.info(f"[AFTER RADIUS-BASED OUTLIER REMOVAL]")
+        # self.logger.info(f"Pole points: {rad_filt_pole_points} [-{pole_reduction_pct:.2f}%]")
+        # self.logger.info(f"Stem points: {rad_filt_stem_points} [-{stem_reduction_pct:.2f}%]")
+        # self.logger.info(f"Obstacle points: {rad_filt_obstacle_points} [-{obstacle_reduction_pct:.2f}%]")
+        # self.logger.info(f"=================================\n")
 
         # projecting to ground plane
-        bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle = (
+        # bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle = (
+        #     self.project_to_ground_plane(
+        #         pcd_navigable, 
+        #         [down_canopy, 
+        #         rad_filt_stem, 
+        #         rad_filt_pole, 
+        #         rad_filt_obstacle]
+        #     )
+        # )
+
+        bev_navigable, bev_canopy = (
             self.project_to_ground_plane(
                 pcd_navigable, 
-                [down_canopy, 
-                rad_filt_stem, 
-                rad_filt_pole, 
-                rad_filt_obstacle]
+                [down_canopy] 
             )
         )
 
-        [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle] = self.clean_around_features(
-            bev_obstacle, 
-            bev_pole, 
-            bev_stem, 
-            bev_canopy, 
-            bev_navigable
-        )
 
-        bev_collection = [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
+        # [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle] = self.clean_around_features(
+        #     bev_obstacle, 
+        #     bev_pole, 
+        #     bev_stem, 
+        #     bev_canopy, 
+        #     bev_navigable
+        # )
 
-        combined_pcd = self.generate_unified_bev_pcd(bev_collection)
+        # bev_collection = [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
+        bev_collection = [bev_navigable, bev_canopy]
+        
+        combined_pcd = self.generate_unified_bev_pcd(bev_collection)    
 
+        unique_labels = np.unique(combined_pcd.point['label'].numpy())
+        
+        self.logger.info(f"=================================")    
+        self.logger.info(f"Number of unique labels: {len(unique_labels)}")
+        self.logger.info(f"Unique labels: {unique_labels}")
+        self.logger.info(f"=================================\n")
 
         # debug_utils.plot_bev_scatter(bev_collection)
 

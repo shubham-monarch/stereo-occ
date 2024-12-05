@@ -11,11 +11,12 @@ import numpy as np
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import time
+import cv2
 
 # custom modules
-from utils import io_utils
+from utils.log_utils import get_logger
 from bev_voxelizer import BevVoxelizer
-
+from utils.data_generator import pcd_to_bev, count_unique_labels
 # TO-DO
 # - priority based collapsing
 # - crop pointcloud to bounding boxs
@@ -26,60 +27,83 @@ from bev_voxelizer import BevVoxelizer
 # - refactor compute_tilt_matrix()
 # - make project_to_ground_plane more robust
 
-# LOGGING SETUP
-logger = logging.getLogger(__name__)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(lineno)d')
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-coloredlogs.install(level='INFO', logger=logger, force=True)
 
 
 if __name__ == "__main__":
     
-    src_folder = "pcd-files/vineyards/RJM"
+    # src_folder = "pcd-files/vineyards/RJM"
     
-    vis = o3d.visualization.Visualizer()
+    # vis = o3d.visualization.Visualizer()
+    logger = get_logger("main")
     
     
-    segmented_pcd_folder = "pcd-files/vineyards/RJM"
-    segmented_pcd_folder_files = os.listdir(segmented_pcd_folder)
+    # segmented_pcd_folder = "bev-voxelizer/train-data/0/left-segmented-labelled.ply"
+    # segmented_pcd_folder_files = os.listdir(segmented_pcd_folder)
     
     # random.seed(0)
     # file = random.choice(segmented_pcd_folder_files)
-    file  = "vineyards_RJM_15.ply"
+    # file  = "vineyards_RJM_15.ply"
     # file = "vineyards_RJM_38.ply"
     
-    try:
-        logger.warning(f"=================================")        
-        logger.warning(f"Processing {file}")
-        logger.warning(f"=================================\n")
-                
-        pcd_input = o3d.t.io.read_point_cloud(os.path.join(segmented_pcd_folder, file))
-        
-        bev_voxelizer = BevVoxelizer()
-        combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
+    file =  "train-data/0/left-segmented-labelled.ply"
 
-        # output_file_path = os.path.join(segmented_pcd_folder, "combined_output.ply")
-        o3d.t.io.write_point_cloud("combined_output.ply", combined_pcd)
-        logger.info(f"Saved combined point cloud to combined_output.ply")
+    logger.warning(f"=================================")        
+    logger.warning(f"Processing {file}")
+    logger.warning(f"=================================\n")
+    
+    # pcd_input = o3d.t.io.read_point_cloud(os.path.join(segmented_pcd_folder, file))
+    pcd_input = o3d.t.io.read_point_cloud(file)
+    
+    bev_voxelizer = BevVoxelizer()
+    combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
+
+    bev_array = pcd_to_bev(combined_pcd)
+
+    # Save BEV array as image
+    output_path = "bev_output.png"
+    cv2.imwrite(output_path, bev_array)
+    logger.info(f"Saved BEV image to {output_path}")
+
+
+    num_unique_labels, unique_labels = count_unique_labels(bev_array)
+    logger.info(f"=================================")
+    logger.info(f"Number of unique labels: {num_unique_labels}")
+    logger.info(f"Unique labels: {unique_labels}")
+    logger.info(f"=================================\n")
+
+
+
+    # try:
+    #     logger.warning(f"=================================")        
+    #     logger.warning(f"Processing {file}")
+    #     logger.warning(f"=================================\n")
+                
+    #     # pcd_input = o3d.t.io.read_point_cloud(os.path.join(segmented_pcd_folder, file))
+    #     pcd_input = o3d.t.io.read_point_cloud(file)
+        
+    #     bev_voxelizer = BevVoxelizer()
+    #     combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
+
+    #     # output_file_path = os.path.join(segmented_pcd_folder, "combined_output.ply")
+    #     o3d.t.io.write_point_cloud("combined_output.ply", combined_pcd)
+    #     logger.info(f"Saved combined point cloud to combined_output.ply")
         
         
-        vis.create_window()
+    #     vis.create_window()
         
-        # Co-ordinate frame for vis window      
-        coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
-        vis.add_geometry(coordinate_frame)
+    #     # Co-ordinate frame for vis window      
+    #     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
+    #     vis.add_geometry(coordinate_frame)
         
-        # Adding point clouds to visualizer
-        vis.add_geometry(combined_pcd.to_legacy())
+    #     # Adding point clouds to visualizer
+    #     vis.add_geometry(combined_pcd.to_legacy())
         
-        view_ctr = vis.get_view_control()
-        view_ctr.set_front(np.array([0, -1, 0]))
-        view_ctr.set_up(np.array([0, 0, 1]))
-        view_ctr.set_zoom(0.9)
+    #     view_ctr = vis.get_view_control()
+    #     view_ctr.set_front(np.array([0, -1, 0]))
+    #     view_ctr.set_up(np.array([0, 0, 1]))
+    #     view_ctr.set_zoom(0.9)
         
-        vis.run()
-        vis.destroy_window()
-    except Exception as e:
-        logger.error(f"Error processing {file}: {e}")
+    #     vis.run()
+    #     vis.destroy_window()
+    # except Exception as e:
+    #     logger.error(f"Error processing {file}: {e}")
