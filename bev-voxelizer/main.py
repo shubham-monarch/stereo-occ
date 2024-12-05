@@ -75,6 +75,9 @@ if __name__ == "__main__":
     cv2.imwrite(output_path, seg_mask_rgb)
     logger.info(f"Saved BEV image to {output_path}")
 
+    cv2.imshow("Segmentation Mask RGB", seg_mask_rgb)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
     # try:
     #     logger.warning(f"=================================")        
