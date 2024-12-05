@@ -79,7 +79,6 @@ def count_unique_labels(mask_img: np.ndarray):
 
 
 
-
 def pcd_to_segmentation_mask_mono(
     pcd: o3d.t.geometry.PointCloud,
     H: int = 480,
