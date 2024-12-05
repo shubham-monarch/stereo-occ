@@ -16,7 +16,8 @@ import cv2
 # custom modules
 from utils.log_utils import get_logger
 from bev_voxelizer import BevVoxelizer
-from utils.data_generator import pcd_to_bev, count_unique_labels
+from utils.data_generator import count_unique_labels, pcd_to_segmentation_mask_mono
+
 # TO-DO
 # - priority based collapsing
 # - crop pointcloud to bounding boxs
@@ -57,10 +58,10 @@ if __name__ == "__main__":
     bev_voxelizer = BevVoxelizer()
     combined_pcd = bev_voxelizer.generate_bev_voxels(pcd_input)
 
-    bev_array = pcd_to_bev(combined_pcd)
+    bev_array = pcd_to_segmentation_mask_mono(combined_pcd)
 
     # Save BEV array as image
-    output_path = "bev_output.png"
+    output_path = "seg-mask-mono.png"
     cv2.imwrite(output_path, bev_array)
     logger.info(f"Saved BEV image to {output_path}")
 
@@ -68,7 +69,6 @@ if __name__ == "__main__":
     num_unique_labels, unique_labels = count_unique_labels(bev_array)
     logger.info(f"=================================")
     logger.info(f"Number of unique labels: {num_unique_labels}")
-    logger.info(f"Unique labels: {unique_labels}")
     logger.info(f"=================================\n")
 
 
