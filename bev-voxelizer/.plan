@@ -1,0 +1,17 @@
++ priority based collapsing
++ resolution based collapsing
++ refactoring generate_bev_voxels()
+
+- handling negative values
+- shift logger to init.py
+- fix plot_bev_scatter() color issue
+
+
+- priority based collapsing
+- crop pointcloud to bounding boxs
+- hidden point removal 
+- farthest point sampling
+- checkout bev-former voxelizer
+- statistical outlier removal
+- refactor compute_tilt_matrix()
+- make project_to_ground_plane more robust

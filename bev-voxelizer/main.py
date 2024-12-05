@@ -16,18 +16,7 @@ import cv2
 # custom modules
 from utils.log_utils import get_logger
 from bev_voxelizer import BevVoxelizer
-from utils.data_generator import count_unique_labels, pcd_to_segmentation_mask_mono
-
-# TO-DO
-# - priority based collapsing
-# - crop pointcloud to bounding boxs
-# - hidden point removal 
-# - farthest point sampling
-# - checkout bev-former voxelizer
-# - statistical outlier removal
-# - refactor compute_tilt_matrix()
-# - make project_to_ground_plane more robust
-
+from utils.data_generator import count_unique_labels, pcd_to_segmentation_mask_mono, mono_to_rgb_mask, get_label_colors_from_yaml
 
 
 if __name__ == "__main__":
@@ -69,8 +58,22 @@ if __name__ == "__main__":
     num_unique_labels, unique_labels = count_unique_labels(bev_array)
     logger.info(f"=================================")
     logger.info(f"Number of unique labels: {num_unique_labels}")
+    logger.info(f"Unique labels: {unique_labels}")
     logger.info(f"=================================\n")
 
+  
+    # Load colors from yaml file
+    label_colors_bgr, label_colors_rgb = get_label_colors_from_yaml("Mavis.yaml")
+
+    logger.info(f"=================================")
+    logger.info(f"label_colors_bgr: {label_colors_bgr}")
+    logger.info(f"=================================\n")
+
+    seg_mask_rgb = mono_to_rgb_mask(bev_array, label_colors_bgr)
+
+    output_path = "seg-mask-rgb.png"
+    cv2.imwrite(output_path, seg_mask_rgb)
+    logger.info(f"Saved BEV image to {output_path}")
 
 
     # try:

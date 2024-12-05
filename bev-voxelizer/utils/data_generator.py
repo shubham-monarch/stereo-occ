@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 import shutil
 from tqdm import tqdm
+import yaml
 
 from bev_voxelizer import BevVoxelizer
 from utils.log_utils import get_logger
@@ -20,25 +21,42 @@ def list_base_folders(folder_path):
             base_folders.append(os.path.join(root, dir_name))
     return base_folders
 
+def get_label_colors_from_yaml(yaml_path="Mavis.yaml"):
+    """Read label colors from Mavis.yaml config file."""
+        
+    with open(yaml_path, 'r') as f:
+        config = yaml.safe_load(f)
+        
+    # Get BGR colors directly from yaml color_map
+    label_colors_bgr = config['color_map']
+    
+    # Convert BGR to RGB by reversing color channels
+    label_colors_rgb = {
+        label: color[::-1] 
+        for label, color in label_colors_bgr.items()
+    }
+    
+    return label_colors_bgr, label_colors_rgb
+        
 
-# def mono_to_rgb_mask(mono_mask: np.ndarray, label_colors: dict) -> np.ndarray:
-#     """Convert single channel segmentation mask to RGB using provided label mapping.
+def mono_to_rgb_mask(mono_mask: np.ndarray, label_colors: dict) -> np.ndarray:
+    """Convert single channel segmentation mask to RGB using provided label mapping.
     
-#     Args:
-#         mono_mask: Single channel segmentation mask with integer labels
-#         label_colors: Dictionary mapping label IDs to RGB values (e.g. {1: [255,0,0]})
+    Args:
+        mono_mask: Single channel segmentation mask with integer labels
+        label_colors: Dictionary mapping label IDs to RGB values (e.g. {1: [255,0,0]})
         
-#     Returns:
-#         RGB segmentation mask with shape (H,W,3)
-#     """
-#     H, W = mono_mask.shape
-#     rgb_mask = np.zeros((H, W, 3), dtype=np.uint8)
+    Returns:
+        RGB segmentation mask with shape (H,W,3)
+    """
+    H, W = mono_mask.shape
+    rgb_mask = np.zeros((H, W, 3), dtype=np.uint8)
     
-#     for label_id, rgb_value in label_colors.items():
-#         mask = mono_mask == label_id
-#         rgb_mask[mask] = rgb_value
+    for label_id, rgb_value in label_colors.items():
+        mask = mono_mask == label_id
+        rgb_mask[mask] = rgb_value
         
-#     return rgb_mask
+    return rgb_mask
 
 
 def count_unique_labels(mask_img: np.ndarray):

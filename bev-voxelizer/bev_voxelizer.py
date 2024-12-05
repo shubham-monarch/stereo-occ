@@ -458,34 +458,34 @@ class BevVoxelizer:
         # self.logger.info(f"=================================\n")
 
         # projecting to ground plane
-        # bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle = (
-        #     self.project_to_ground_plane(
-        #         pcd_navigable, 
-        #         [down_canopy, 
-        #         rad_filt_stem, 
-        #         rad_filt_pole, 
-        #         rad_filt_obstacle]
-        #     )
-        # )
-
-        bev_navigable, bev_canopy = (
+        bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle = (
             self.project_to_ground_plane(
                 pcd_navigable, 
-                [down_canopy] 
+                [down_canopy, 
+                rad_filt_stem, 
+                rad_filt_pole, 
+                rad_filt_obstacle]
             )
         )
 
-
-        # [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle] = self.clean_around_features(
-        #     bev_obstacle, 
-        #     bev_pole, 
-        #     bev_stem, 
-        #     bev_canopy, 
-        #     bev_navigable
+        # bev_navigable, bev_canopy = (
+        #     self.project_to_ground_plane(
+        #         pcd_navigable, 
+        #         [down_canopy] 
+        #     )
         # )
 
-        # bev_collection = [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
-        bev_collection = [bev_navigable, bev_canopy]
+
+        [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle] = self.clean_around_features(
+            bev_obstacle, 
+            bev_pole, 
+            bev_stem, 
+            bev_canopy, 
+            bev_navigable
+        )
+
+        bev_collection = [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
+        # bev_collection = [bev_navigable, bev_canopy]
         
         combined_pcd = self.generate_unified_bev_pcd(bev_collection)    
 
