@@ -5,8 +5,9 @@ import numpy as np
 import open3d.core as o3c
 from scipy.spatial import cKDTree
 from utils import debug_utils
-from typing import List
+from typing import List, Tuple, Optional
 from utils.log_utils import get_logger
+import torch
 
 class BevVoxelizer:
     def __init__(self):
@@ -349,9 +350,8 @@ class BevVoxelizer:
 
         return [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
 
-    
     def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
-        
+        """Generate BEV voxels for a single point cloud"""
         pcd_corrected = self.tilt_rectification(pcd_input)
 
         # filtering unwanted labels => [vegetation, tractor-hood, void, sky]

@@ -18,4 +18,6 @@
 
 
 - make [pcd-segmented to bev-segmented pipeline] fast
+- use GPU parallelization
 - fix BEV GT resolution
+- BEV GT should be centered
