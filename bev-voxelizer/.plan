@@ -16,11 +16,37 @@
 + refactor compute_tilt_matrix()
 + make project_to_ground_plane more robust
 
-
-- make [pcd-segmented to bev-segmented pipeline] fast
-- use GPU parallelization
-- fix BEV GT resolution
-- BEV GT should be centered
 - remove main.py
-- major refactoring pending
-- remove utils folder
++ major refactoring 
++ remove utils folder
+
+* make [pcd-segmented to bev-segmented pipeline] fast
+    * use GPU parallelization
+    * use CPU parallelization
+
+- get decent baseline results
+
+- fix BEV GT data
+
+- BEV GT should be centered
+- BEV GT should not have black regions
+- BEV GT should have fixed resolution across files
+    
+- fix camera extrinsics 
+
+- need to shift z as well
+- fix [align normal with +y-axis if angle with y-axis is negative] in [project_to_ground_plane]
+- normalize plane normal --> [a,b,c,d]
+- BEV projection was shifted along y. 
+- [debug] project pointcloud to camera to check camera extrinsics
+
+- fix compute_tilt_matrix --> align with x and z-axis as well  
+- need to align two axes instead of one
+- [debug] align x and z, and y should automatically align
+
+- generate camera extrinsics as part of dataset
+- why is normal not completely aligning with the y-axis? 
+
+- add test.py
+- change co-ordinate frame to align with the sbevnet axes
+- time the dataset generation step

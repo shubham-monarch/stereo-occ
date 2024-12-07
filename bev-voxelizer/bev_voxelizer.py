@@ -1,12 +1,13 @@
+#! /usr/bin/env python3
 import logging, coloredlogs
 import open3d as o3d
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d.core as o3c
 from scipy.spatial import cKDTree
-from utils import debug_utils
 from typing import List, Tuple, Optional
-from helpers import get_logger
+from logger import get_logger
+
 import torch
 
 class BevVoxelizer:
@@ -41,34 +42,6 @@ class BevVoxelizer:
                                                         num_iterations=1000)
         return plane_model.numpy()
     
-    def plot_plane_histogram(self,pcd: o3d.t.geometry.PointCloud):
-    
-        
-        positions = pcd.point['positions'].numpy()
-        x_values = positions[:, 0]
-        y_values = positions[:, 1]
-        z_values = positions[:, 2]
-
-        fig, axs = plt.subplots(3, 1, figsize=(10, 15))
-
-        axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
-        axs[0].set_title('Histogram of X values')
-        axs[0].set_xlabel('X')
-        axs[0].set_ylabel('Frequency')
-
-        axs[1].hist(y_values, bins=50, color='g', alpha=0.7)
-        axs[1].set_title('Histogram of Y values')
-        axs[1].set_xlabel('Y')
-        axs[1].set_ylabel('Frequency')
-
-        axs[2].hist(z_values, bins=50, color='b', alpha=0.7)
-        axs[2].set_title('Histogram of Z values')
-        axs[2].set_xlabel('Z')
-        axs[2].set_ylabel('Frequency')
-
-        plt.tight_layout()
-        plt.show()
-
     def align_normal_to_y_axis(self,normal_):
         '''
         Rotation matrix to align the normal vector to the y-axis
@@ -247,9 +220,12 @@ class BevVoxelizer:
         # sanity check
         normal, _ = self.get_class_plane(pcd_input, self.LABELS["NAVIGABLE_SPACE"]["id"])
         normal_ = np.dot(normal, R.T)
-        angles = self.axis_angles(normal_)
-        yaw_, pitch_, roll_ = angles
         
+        # Calculate angles using the axis_angles function
+        angles = self.axis_angles(normal_)
+        
+        pitch_, roll_, yaw_ = angles[0], angles[2], angles[1]
+
         self.logger.warning(f"=================================")    
         self.logger.warning(f"[BEFORE TILT RECTIFICATION] Yaw: {yaw:.2f} degrees, Pitch: {pitch:.2f} degrees, Roll: {roll:.2f} degrees")
         self.logger.warning(f"[AFTER  TILT RECTIFICATION] Yaw: {yaw_:.2f} degrees, Pitch: {pitch_:.2f} degrees, Roll: {roll_:.2f} degrees")
@@ -499,3 +475,9 @@ class BevVoxelizer:
         # debug_utils.plot_bev_scatter(bev_collection)
 
         return combined_pcd
+
+
+if __name__ == "__main__":
+    pcd_input = o3d.t.io.read_point_cloud("debug/left-segmented-labelled.ply")
+    bev_voxelizer = BevVoxelizer()
+    bev_voxelizer.generate_bev_voxels(pcd_input)

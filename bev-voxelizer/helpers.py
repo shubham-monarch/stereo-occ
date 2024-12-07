@@ -13,29 +13,13 @@ import logging
 import sys
 import coloredlogs
 import yaml
+import matplotlib.pyplot as plt
+
+from logger import get_logger
 from bev_voxelizer import BevVoxelizer
 
-def get_logger(name, level=logging.INFO):
-    '''Get a logger with colored output'''
-    
-    logging.basicConfig(level=level)
-    logger = logging.getLogger(name)
-    logger.propagate = False
-    formatter = logging.Formatter(
-        fmt="%(asctime)s %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
-    )
-    consoleHandler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter(
-        fmt="\x1b[32m%(asctime)s\x1b[0m %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
-    )
-    consoleHandler.setFormatter(formatter)
-    logger.handlers = [consoleHandler]
-    coloredlogs.install(level=level, logger=logger, force=True)
 
-    return logger    
-
-
-logger = get_logger("data_generator")
+logger = get_logger("helpers")
 
 def list_base_folders(folder_path):
     base_folders = []
@@ -43,6 +27,35 @@ def list_base_folders(folder_path):
         for dir_name in dirs:
             base_folders.append(os.path.join(root, dir_name))
     return base_folders
+
+def plot_plane_histogram(self,pcd: o3d.t.geometry.PointCloud):
+    
+        
+        positions = pcd.point['positions'].numpy()
+        x_values = positions[:, 0]
+        y_values = positions[:, 1]
+        z_values = positions[:, 2]
+
+        fig, axs = plt.subplots(3, 1, figsize=(10, 15))
+
+        axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
+        axs[0].set_title('Histogram of X values')
+        axs[0].set_xlabel('X')
+        axs[0].set_ylabel('Frequency')
+
+        axs[1].hist(y_values, bins=50, color='g', alpha=0.7)
+        axs[1].set_title('Histogram of Y values')
+        axs[1].set_xlabel('Y')
+        axs[1].set_ylabel('Frequency')
+
+        axs[2].hist(z_values, bins=50, color='b', alpha=0.7)
+        axs[2].set_title('Histogram of Z values')
+        axs[2].set_xlabel('Z')
+        axs[2].set_ylabel('Frequency')
+
+        plt.tight_layout()
+        plt.show()
+
 
 def get_label_colors_from_yaml(yaml_path=None):
     """Read label colors from Mavis.yaml config file."""
@@ -63,8 +76,7 @@ def get_label_colors_from_yaml(yaml_path=None):
         
 
 def mono_to_rgb_mask(mono_mask: np.ndarray, yaml_path: str = "Mavis.yaml") -> np.ndarray:
-    """Convert single channel segmentation mask to 
-    RGB using label mapping from a YAML file."""
+    """Convert single channel segmentation mask to RGB using label mapping from a YAML file."""
     
     label_colors_bgr, _ = get_label_colors_from_yaml(yaml_path)
     
@@ -94,12 +106,7 @@ def count_unique_labels(mask_img: np.ndarray):
     
     return len(unique_colors), unique_colors
 
-
-def pcd_to_segmentation_mask_mono(
-    pcd: o3d.t.geometry.PointCloud,
-    H: int = 480,
-    W: int = 640
-) -> np.ndarray:
+def pcd_to_segmentation_mask_mono(pcd: o3d.t.geometry.PointCloud, H: int = 480, W: int = 640) -> np.ndarray:
     """Generate a 2D segmentation mask from a labeled pointcloud.    """
     
     # Extract point coordinates and labels
@@ -147,48 +154,42 @@ def pcd_to_segmentation_mask_mono(
 
 
 def crop_pointcloud(
-    pcd_path: str,
-    output_path: str = None
+    src_pcd: o3d.t.geometry.PointCloud,
+    output_path: str
 ) -> None:
     """Crop a point cloud to a specified area and save it to disk."""
     
-    assert output_path is not None, "output_path must be provided"
-    
     logger.info(f"=================================")
-    logger.info(f"Cropping point cloud from {pcd_path} to {output_path}")
+    logger.info(f"Cropping point cloud to {output_path}")
     logger.info(f"=================================\n")
 
-    # Read the point cloud from the given path
-    pcd = o3d.t.io.read_point_cloud(pcd_path)
-
     # Extract point coordinates and labels
-    x_coords = pcd.point['positions'][:, 0].numpy()
-    z_coords = pcd.point['positions'][:, 2].numpy()
-    labels = pcd.point['label'].numpy()
-    colors = pcd.point['colors'].numpy()
+    x_coords = src_pcd.point['positions'][:, 0].numpy()
+    y_coords = src_pcd.point['positions'][:, 1].numpy()
+    z_coords = src_pcd.point['positions'][:, 2].numpy()
+    labels = src_pcd.point['label'].numpy()
+    colors = src_pcd.point['colors'].numpy()
 
     # Crop points to 20m x 10m area
     valid_indices = np.where(
-        (x_coords >= -10) & (x_coords <= 10) & 
-        (z_coords >= 0) & (z_coords <= 20)
+        (z_coords >= 0) & (z_coords <= 5)
     )[0]
 
     x_coords = x_coords[valid_indices]
+    y_coords = y_coords[valid_indices]
     z_coords = z_coords[valid_indices]
     labels = labels[valid_indices]
     colors = colors[valid_indices]
 
     # Create a new point cloud with the cropped points
     cropped_pcd = o3d.t.geometry.PointCloud()
-    cropped_pcd.point['positions'] = o3d.core.Tensor(np.column_stack((x_coords, np.zeros_like(x_coords), z_coords)), dtype=o3d.core.Dtype.Float32)
-    cropped_pcd.point['labels'] = o3d.core.Tensor(labels, dtype=o3d.core.Dtype.Int32)
-    cropped_pcd.point['colors'] = o3d.core.Tensor(colors, dtype=o3d.core.Dtype.Float32)
+    cropped_pcd.point['positions'] = o3d.core.Tensor(np.column_stack((x_coords, y_coords, z_coords)), dtype=o3d.core.Dtype.Float32)
+    cropped_pcd.point['label'] = o3d.core.Tensor(labels, dtype=o3d.core.Dtype.UInt8)
+    cropped_pcd.point['colors'] = o3d.core.Tensor(colors, dtype=o3d.core.Dtype.UInt8)
     
     o3d.t.io.write_point_cloud(output_path, cropped_pcd)
-    
-    logger.info(f"=================================")
     logger.info(f"Cropped point cloud saved to {output_path}")
-    logger.info(f"=================================\n")
+
 
 # def add_seg_masks_to_dataset(folder_path):
 #     """Recursively find all 'left-segmented-labelled.ply' files in the given folder path."""
@@ -234,9 +235,5 @@ if __name__ == "__main__":
     # CASE 1: 
     # add_seg_masks_to_dataset(train_folder)
 
-    # # CASE 2: Crop point clouds and save them to disk
-    # src_pcd_path = "train-data/144/left-segmented-labelled.ply"
-    # dst_pcd_path = "debug/cropped_pointcloud.ply"
-    # crop_pointcloud(src_pcd_path, dst_pcd_path)
-    
     pass
+    
