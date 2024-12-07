@@ -10,8 +10,10 @@ from logger import get_logger
 
 import torch
 
-class BevVoxelizer:
+class BEVGenerator:
     def __init__(self):
+        
+        '''BEV data from segmented pointcloud'''
         
         self.LABELS = {    
             "OBSTACLE": {"id": 1, "priority": 1},
@@ -75,13 +77,10 @@ class BevVoxelizer:
         map_to_tensors = {}
         map_to_tensors['positions'] = stacked_positions
         map_to_tensors['label'] = stacked_labels
-        map_to_tensors['colors'] = stacked_colors
-        
-        
+        map_to_tensors['colors'] = stacked_colors        
 
         combined_pcd = o3d.t.geometry.PointCloud(map_to_tensors)    
         return combined_pcd
-
 
     def axis_angles(self,vec):
         '''
@@ -95,6 +94,7 @@ class BevVoxelizer:
         angle_y = np.arccos(np.dot(vec, y_axis) / np.linalg.norm(vec))
         angle_z = np.arccos(np.dot(vec, z_axis) / np.linalg.norm(vec))
         
+        # pitch, yaw, roll
         return np.degrees(angle_x), np.degrees(angle_y), np.degrees(angle_z)
 
     def compute_tilt_matrix(self, pcd: o3d.t.geometry.PointCloud):
@@ -219,8 +219,17 @@ class BevVoxelizer:
 
         # sanity check
         normal, _ = self.get_class_plane(pcd_input, self.LABELS["NAVIGABLE_SPACE"]["id"])
+        
+        self.logger.info(f"=================================")      
+        self.logger.info(f"[BEFORE] normal.shape: {normal.shape}")
+        self.logger.info(f"=================================\n")
+        
         normal_ = np.dot(normal, R.T)
         
+        self.logger.info(f"=================================")      
+        self.logger.info(f"[AFTER] normal_.shape: {normal_.shape}")
+        self.logger.info(f"=================================\n")
+
         # Calculate angles using the axis_angles function
         angles = self.axis_angles(normal_)
         
@@ -249,12 +258,10 @@ class BevVoxelizer:
     
     def project_to_ground_plane(
         self, 
-        pcd_navigable: o3d.t.geometry.PointCloud,
+        pcd_navigable: o3d.t.geometry.PointCloud, 
         additional_pointclouds: List[o3d.t.geometry.PointCloud]
     ) -> List[o3d.t.geometry.PointCloud]:
-        '''
-        Project the input pointclouds to the navigable plane
-        '''
+        ''' Project the input pointclouds to the navigable plane '''
         
         normal, inliers = self.get_class_plane(pcd_navigable, self.LABELS["NAVIGABLE_SPACE"]["id"])
         normal = normal / np.linalg.norm(normal)
@@ -329,8 +336,9 @@ class BevVoxelizer:
 
         return [bev_navigable, bev_canopy, bev_stem, bev_pole, bev_obstacle]
 
-    def generate_bev_voxels(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
-        """Generate BEV voxels for a single point cloud"""
+    def generate_BEV(self, pcd_input: o3d.t.geometry.PointCloud) -> o3d.t.geometry.PointCloud:
+        """Generate BEV from segmented pointcloud"""
+        
         pcd_corrected = self.tilt_rectification(pcd_input)
 
         # filtering unwanted labels => [vegetation, tractor-hood, void, sky]
@@ -479,8 +487,59 @@ class BevVoxelizer:
 
         return combined_pcd
 
+    def pcd_to_segmentation_mask_mono(pcd: o3d.t.geometry.PointCloud, H: int = 480, W: int = 640) -> np.ndarray:
+        """2D segmentation mask from BEV pcd."""
+        # z-axis --> points into the scene is +ve
+        # y-axis --> pointing down is +ve
+        # x-axis --> pointing right is +ve
+        
+        # extract point coordinates and labels
+        x_coords = pcd.point['positions'][:, 0].numpy()
+        z_coords = pcd.point['positions'][:, 2].numpy()
+        labels = pcd.point['label'].numpy()
+
+        # crop points to 20m x 10m area
+        valid_indices = np.where(
+            (x_coords >= -10) & (x_coords <= 10) & 
+            (z_coords >= 0) & (z_coords <= 20)
+        )[0]
+
+        x_coords = x_coords[valid_indices]
+        z_coords = z_coords[valid_indices]
+        labels = labels[valid_indices]
+
+        # scale coordinates to image dimensions
+        x_min, x_max = x_coords.min(), x_coords.max()
+        z_min, z_max = z_coords.min(), z_coords.max()
+
+        x_scaled = ((x_coords - x_min) / (x_max - x_min) * (W - 1)).astype(np.int32)
+        z_scaled = ((z_coords - z_min) / (z_max - z_min) * (H - 1)).astype(np.int32)
+
+        # create empty mask
+        mask = np.zeros((H, W), dtype=np.uint8)
+
+        # label mapping (using original label values directly)
+        # 1: Obstacle
+        # 2: Navigable Space
+        # 3: Vine Canopy  
+        # 4: Vine Stem
+        # 5: Vine Pole
+
+        # # fill mask with label values
+        # for x, z, label in zip(x_scaled, z_scaled, labels):
+        #     if 1 <= label <= 5:  # only use valid label values
+        #         mask[z, x] = label
+
+        # fill mask with label values
+        for x, z, label in zip(x_scaled, z_scaled, labels):
+            mask[H - z - 1, x] = label  # invert z to match image coordinates
+
+        return mask
 
 if __name__ == "__main__":
+    
     pcd_input = o3d.t.io.read_point_cloud("debug/left-segmented-labelled.ply")
-    bev_voxelizer = BevVoxelizer()
-    bev_voxelizer.generate_bev_voxels(pcd_input)
+    
+    bev_generator = BEVGenerator()
+    bev_pcd = bev_generator.generate_BEV(pcd_input)
+    

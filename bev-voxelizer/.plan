@@ -50,3 +50,4 @@
 - add test.py
 - change co-ordinate frame to align with the sbevnet axes
 - time the dataset generation step
+- update generate-train-data.py

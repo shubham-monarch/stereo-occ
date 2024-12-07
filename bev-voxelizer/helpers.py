@@ -16,7 +16,6 @@ import yaml
 import matplotlib.pyplot as plt
 
 from logger import get_logger
-from bev_voxelizer import BevVoxelizer
 
 
 logger = get_logger("helpers")
@@ -28,34 +27,26 @@ def list_base_folders(folder_path):
             base_folders.append(os.path.join(root, dir_name))
     return base_folders
 
-def plot_plane_histogram(self,pcd: o3d.t.geometry.PointCloud):
+def visualize_pcd(pcd: o3d.t.geometry.PointCloud):
+    """Visualize a point cloud using Open3D."""
     
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
         
-        positions = pcd.point['positions'].numpy()
-        x_values = positions[:, 0]
-        y_values = positions[:, 1]
-        z_values = positions[:, 2]
+    # Co-ordinate frame for vis window      
+    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
+    vis.add_geometry(coordinate_frame)
 
-        fig, axs = plt.subplots(3, 1, figsize=(10, 15))
-
-        axs[0].hist(x_values, bins=50, color='r', alpha=0.7)
-        axs[0].set_title('Histogram of X values')
-        axs[0].set_xlabel('X')
-        axs[0].set_ylabel('Frequency')
-
-        axs[1].hist(y_values, bins=50, color='g', alpha=0.7)
-        axs[1].set_title('Histogram of Y values')
-        axs[1].set_xlabel('Y')
-        axs[1].set_ylabel('Frequency')
-
-        axs[2].hist(z_values, bins=50, color='b', alpha=0.7)
-        axs[2].set_title('Histogram of Z values')
-        axs[2].set_xlabel('Z')
-        axs[2].set_ylabel('Frequency')
-
-        plt.tight_layout()
-        plt.show()
-
+    # adding point clouds to visualizer
+    vis.add_geometry(pcd.to_legacy())
+        
+    view_ctr = vis.get_view_control()
+    view_ctr.set_front(np.array([0, -1, 0]))
+    view_ctr.set_up(np.array([0, 0, 1]))
+    view_ctr.set_zoom(0.9)
+        
+    vis.run()
+    vis.destroy_window()
 
 def get_label_colors_from_yaml(yaml_path=None):
     """Read label colors from Mavis.yaml config file."""
@@ -106,53 +97,6 @@ def count_unique_labels(mask_img: np.ndarray):
     
     return len(unique_colors), unique_colors
 
-def pcd_to_segmentation_mask_mono(pcd: o3d.t.geometry.PointCloud, H: int = 480, W: int = 640) -> np.ndarray:
-    """Generate a 2D segmentation mask from a labeled pointcloud.    """
-    
-    # Extract point coordinates and labels
-    x_coords = pcd.point['positions'][:, 0].numpy()
-    z_coords = pcd.point['positions'][:, 2].numpy()
-    labels = pcd.point['label'].numpy()
-
-    # Crop points to 20m x 10m area
-    valid_indices = np.where(
-        (x_coords >= -10) & (x_coords <= 10) & 
-        (z_coords >= 0) & (z_coords <= 20)
-    )[0]
-
-    x_coords = x_coords[valid_indices]
-    z_coords = z_coords[valid_indices]
-    labels = labels[valid_indices]
-
-    # Scale coordinates to image dimensions
-    x_min, x_max = x_coords.min(), x_coords.max()
-    z_min, z_max = z_coords.min(), z_coords.max()
-
-    x_scaled = ((x_coords - x_min) / (x_max - x_min) * (W - 1)).astype(np.int32)
-    z_scaled = ((z_coords - z_min) / (z_max - z_min) * (H - 1)).astype(np.int32)
-
-    # Create empty mask
-    mask = np.zeros((H, W), dtype=np.uint8)
-
-    # Label mapping (using original label values directly)
-    # 1: Obstacle
-    # 2: Navigable Space
-    # 3: Vine Canopy  
-    # 4: Vine Stem
-    # 5: Vine Pole
-
-    # # Fill mask with label values
-    # for x, z, label in zip(x_scaled, z_scaled, labels):
-    #     if 1 <= label <= 5:  # Only use valid label values
-    #         mask[z, x] = label
-
-    # Fill mask with label values
-    for x, z, label in zip(x_scaled, z_scaled, labels):
-        mask[H - z - 1, x] = label  # Invert z to match image coordinates
-
-    return mask
-
-
 def crop_pointcloud(
     src_pcd: o3d.t.geometry.PointCloud,
     output_path: str
@@ -191,7 +135,7 @@ def crop_pointcloud(
     logger.info(f"Cropped point cloud saved to {output_path}")
 
 
-# def add_seg_masks_to_dataset(folder_path):
+# def add_seg_masks_to_dataset(src_folder: str, dst_folder: str = None):
 #     """Recursively find all 'left-segmented-labelled.ply' files in the given folder path."""
     
     
@@ -235,5 +179,5 @@ if __name__ == "__main__":
     # CASE 1: 
     # add_seg_masks_to_dataset(train_folder)
 
+    # CASE 2: 
     pass
-    
