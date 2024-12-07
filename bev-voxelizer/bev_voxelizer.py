@@ -224,6 +224,9 @@ class BevVoxelizer:
         # Calculate angles using the axis_angles function
         angles = self.axis_angles(normal_)
         
+        # pitch: rotation around the x-axis.
+        # roll: rotation around the z-axis
+        # yaw: rotation around the y-axis
         pitch_, roll_, yaw_ = angles[0], angles[2], angles[1]
 
         self.logger.warning(f"=================================")    
