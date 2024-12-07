@@ -6,7 +6,7 @@ import open3d.core as o3c
 from scipy.spatial import cKDTree
 from utils import debug_utils
 from typing import List, Tuple, Optional
-from utils.log_utils import get_logger
+from helpers import get_logger
 import torch
 
 class BevVoxelizer:
@@ -499,27 +499,3 @@ class BevVoxelizer:
         # debug_utils.plot_bev_scatter(bev_collection)
 
         return combined_pcd
-
-    def generate_bev_voxels_batch(self, pcd_batch: List[o3d.t.geometry.PointCloud]) -> List[o3d.t.geometry.PointCloud]:
-        """Generate BEV voxels for a batch of point clouds using GPU acceleration"""
-        # Convert point clouds to tensors
-        positions_batch = [pcd.point['positions'].numpy() for pcd in pcd_batch]
-        labels_batch = [pcd.point['label'].numpy() for pcd in pcd_batch]
-        colors_batch = [pcd.point['colors'].numpy() for pcd in pcd_batch]
-        
-        # Move data to GPU if available
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
-        # Example: Stack and convert to tensors
-        positions = torch.tensor(np.stack(positions_batch)).to(device)
-        labels = torch.tensor(np.stack(labels_batch)).to(device)
-        colors = torch.tensor(np.stack(colors_batch)).to(device)
-        
-        # Placeholder for GPU-accelerated BEV voxel generation
-        # Implement the actual BEV voxelization logic using GPU operations
-        bev_voxel_batch = []
-        for p in range(len(pcd_batch)):
-            bev_voxel = self.generate_bev_voxels(pcd_batch[p])  # Replace with GPU-accelerated version
-            bev_voxel_batch.append(bev_voxel)
-        
-        return bev_voxel_batch

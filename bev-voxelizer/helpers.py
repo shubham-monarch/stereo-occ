@@ -9,69 +9,142 @@ import cv2
 import os
 import fnmatch
 import torch
-from torch.utils.data import Dataset, DataLoader
-
-
+import logging
+import sys
+import coloredlogs
+import yaml
 from bev_voxelizer import BevVoxelizer
-from utils.data_generator import pcd_to_segmentation_mask_mono, mono_to_rgb_mask
-from utils.log_utils import get_logger
 
-logger = get_logger("helpers")
-
-
-
-class PointCloudDataset(Dataset):
-    """Custom dataset for loading point clouds."""
+def get_logger(name, level=logging.INFO):
+    '''Get a logger with colored output'''
     
-    def __init__(self, data_dir):
-        self.logger = get_logger("PointCloudDataset")
-        self.data_dir = data_dir
-        self.pointcloud_files = self.find_files()
-        
-    def find_files(self):
-        """Recursively find files named 'left-segmented-labelled.ply'."""
-        matches = []
-        for root, _, files in os.walk(self.data_dir):
-            for filename in fnmatch.filter(files, "left-segmented-labelled.ply"):
-                matches.append(os.path.join(root, filename))
-        
-        
-        self.logger.info(f"=================================")
-        self.logger.info(f"Found {len(matches)} point cloud files in {self.data_dir}")
-        self.logger.info(f"=================================\n")
-        
-        return matches
+    logging.basicConfig(level=level)
+    logger = logging.getLogger(name)
+    logger.propagate = False
+    formatter = logging.Formatter(
+        fmt="%(asctime)s %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
+    )
+    consoleHandler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+        fmt="\x1b[32m%(asctime)s\x1b[0m %(message)s", datefmt="%Y/%m/%d %H:%M:%S"
+    )
+    consoleHandler.setFormatter(formatter)
+    logger.handlers = [consoleHandler]
+    coloredlogs.install(level=level, logger=logger, force=True)
 
-    def load_pointcloud(self, file):
-        """Load a point cloud from a file."""
-        return o3d.t.io.read_point_cloud(file)
+    return logger    
 
-    def __len__(self):
-        """Return the total number of point clouds."""
-        return len(self.pointcloud_files)
 
-    def __getitem__(self, idx):
-        """Return a single point cloud as a tensor."""
-        file = self.pointcloud_files[idx]
-        pointcloud = self.load_pointcloud(file)
+logger = get_logger("data_generator")
 
-        # Convert the point cloud to a numpy array and then to a tensor
-        positions = pointcloud.point['positions'].numpy()
-        labels = pointcloud.point['label'].numpy()
-        colors = pointcloud.point['colors'].numpy()
+def list_base_folders(folder_path):
+    base_folders = []
+    for root, dirs, files in os.walk(folder_path):
+        for dir_name in dirs:
+            base_folders.append(os.path.join(root, dir_name))
+    return base_folders
+
+def get_label_colors_from_yaml(yaml_path=None):
+    """Read label colors from Mavis.yaml config file."""
+    
+    with open(yaml_path, 'r') as f:
+        config = yaml.safe_load(f)
         
-        self.logger.info(f"=================================")
-        self.logger.info(f"positions.shape: {positions.shape}")
-        self.logger.info(f"labels.shape: {labels.shape}")
-        self.logger.info(f"colors.shape: {colors.shape}")
-        self.logger.info(f"=================================\n")
+    # Get BGR colors directly from yaml color_map
+    label_colors_bgr = config['color_map']
+    
+    # Convert BGR to RGB by reversing color channels
+    label_colors_rgb = {
+        label: color[::-1] 
+        for label, color in label_colors_bgr.items()
+    }
+    
+    return label_colors_bgr, label_colors_rgb
+        
 
-        # Return as a dictionary or a tuple
-        return {
-            'positions': torch.tensor(positions, dtype=torch.float32),
-            'labels': torch.tensor(labels, dtype=torch.int32),
-            'colors': torch.tensor(colors, dtype=torch.float32)
-        }
+def mono_to_rgb_mask(mono_mask: np.ndarray, yaml_path: str = "Mavis.yaml") -> np.ndarray:
+    """Convert single channel segmentation mask to 
+    RGB using label mapping from a YAML file."""
+    
+    label_colors_bgr, _ = get_label_colors_from_yaml(yaml_path)
+    
+    H, W = mono_mask.shape
+    rgb_mask = np.zeros((H, W, 3), dtype=np.uint8)
+    
+    for label_id, rgb_value in label_colors_bgr.items():
+        mask = mono_mask == label_id
+        rgb_mask[mask] = rgb_value
+        
+    return rgb_mask
+
+
+def count_unique_labels(mask_img: np.ndarray):
+    """Count and return the number of unique labels in a segmented mask image."""
+    
+    if mask_img.ndim == 3:
+        # Convert RGB to single integer for each unique color
+        mask_flat = mask_img.reshape(-1, 3)
+    elif mask_img.ndim == 2:
+        # For 2D array, flatten directly
+        mask_flat = mask_img.flatten()
+    else:
+        raise ValueError("mask_img must be either a 2D or 3D array")
+    
+    unique_colors = np.unique(mask_flat, axis=0)
+    
+    return len(unique_colors), unique_colors
+
+
+def pcd_to_segmentation_mask_mono(
+    pcd: o3d.t.geometry.PointCloud,
+    H: int = 480,
+    W: int = 640
+) -> np.ndarray:
+    """Generate a 2D segmentation mask from a labeled pointcloud.    """
+    
+    # Extract point coordinates and labels
+    x_coords = pcd.point['positions'][:, 0].numpy()
+    z_coords = pcd.point['positions'][:, 2].numpy()
+    labels = pcd.point['label'].numpy()
+
+    # Crop points to 20m x 10m area
+    valid_indices = np.where(
+        (x_coords >= -10) & (x_coords <= 10) & 
+        (z_coords >= 0) & (z_coords <= 20)
+    )[0]
+
+    x_coords = x_coords[valid_indices]
+    z_coords = z_coords[valid_indices]
+    labels = labels[valid_indices]
+
+    # Scale coordinates to image dimensions
+    x_min, x_max = x_coords.min(), x_coords.max()
+    z_min, z_max = z_coords.min(), z_coords.max()
+
+    x_scaled = ((x_coords - x_min) / (x_max - x_min) * (W - 1)).astype(np.int32)
+    z_scaled = ((z_coords - z_min) / (z_max - z_min) * (H - 1)).astype(np.int32)
+
+    # Create empty mask
+    mask = np.zeros((H, W), dtype=np.uint8)
+
+    # Label mapping (using original label values directly)
+    # 1: Obstacle
+    # 2: Navigable Space
+    # 3: Vine Canopy  
+    # 4: Vine Stem
+    # 5: Vine Pole
+
+    # # Fill mask with label values
+    # for x, z, label in zip(x_scaled, z_scaled, labels):
+    #     if 1 <= label <= 5:  # Only use valid label values
+    #         mask[z, x] = label
+
+    # Fill mask with label values
+    for x, z, label in zip(x_scaled, z_scaled, labels):
+        mask[H - z - 1, x] = label  # Invert z to match image coordinates
+
+    return mask
+
 
 def crop_pointcloud(
     pcd_path: str,
@@ -165,17 +238,5 @@ if __name__ == "__main__":
     # src_pcd_path = "train-data/144/left-segmented-labelled.ply"
     # dst_pcd_path = "debug/cropped_pointcloud.ply"
     # crop_pointcloud(src_pcd_path, dst_pcd_path)
-
-
-    # CASE 3: Create a dataloader for point clouds
-    dataset = PointCloudDataset(data_dir="train-data")
-    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
-
-    logger.warning(f"=================================")
-    logger.warning(f"Dataloader created with {len(dataloader)} batches")
-    logger.warning(f"=================================\n")
-
-    for idx, batch in enumerate(dataloader):
-        logger.info(f"=================================")
-        logger.info(f"batch {idx}  ==> {batch}")
-        logger.info(f"=================================\n")
+    
+    pass
