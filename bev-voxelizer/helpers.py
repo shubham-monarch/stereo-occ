@@ -40,10 +40,10 @@ def visualize_pcd(pcd: o3d.t.geometry.PointCloud):
     # adding point clouds to visualizer
     vis.add_geometry(pcd.to_legacy())
         
-    view_ctr = vis.get_view_control()
-    view_ctr.set_front(np.array([0, -1, 0]))
-    view_ctr.set_up(np.array([0, 0, 1]))
-    view_ctr.set_zoom(0.9)
+    # view_ctr = vis.get_view_control()
+    # view_ctr.set_front(np.array([0, -1, 0]))
+    # view_ctr.set_up(np.array([0, 0, 1]))
+    # view_ctr.set_zoom(0.9)
         
     vis.run()
     vis.destroy_window()

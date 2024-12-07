@@ -23,7 +23,7 @@ class BEVGenerator:
             "NAVIGABLE_SPACE": {"id": 2, "priority": 5},  
         }
 
-        self.logger = get_logger("bev_voxelizer")
+        self.logger = get_logger("bev_generator", level=logging.ERROR)
     
     def filter_radius_outliers(self, pcd: o3d.t.geometry.PointCloud, nb_points: int, search_radius: float):
         '''

@@ -57,11 +57,12 @@ if __name__ == "__main__":
 
     # generate BEV
     bev_pcd = bev_generator.generate_BEV(pcd_rectified)
-    
+    # visualize_pcd(bev_pcd)
+
     # crop BEV
     valid_indices = np.where(
-        # y <= 0
-        (pcd_rectified.point['positions'][:, 1].numpy() <= 0) & 
+        # # y <= 0
+        # (pcd_rectified.point['positions'][:, 1].numpy() <= 0) & 
         
         # x between -3 and 3
         (pcd_rectified.point['positions'][:, 0].numpy() >= -3) & 
@@ -72,8 +73,11 @@ if __name__ == "__main__":
         (pcd_rectified.point['positions'][:, 2].numpy() <= 15)
     )[0]
 
+    logger.info(f"================================================")
+    logger.info(f"len(valid_indices): {len(valid_indices)}")
+    logger.info(f"================================================\n")
+    
     bev_pcd_cropped = bev_pcd.select_by_index(valid_indices)        
-
     visualize_pcd(bev_pcd_cropped)
     
     # mask_mono = pcd_to_segmentation_mask_mono(bev_pcd)
