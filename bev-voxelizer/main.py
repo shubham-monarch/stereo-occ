@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-import open3d as o3d    
+import open3d as o3d  
 import open3d.core as o3c
 import shutil
 import os
@@ -34,6 +34,7 @@ if __name__ == "__main__":
     # file = random.choice(segmented_pcd_folder_files)
     # file  = "vineyards_RJM_15.ply"
     # file = "vineyards_RJM_38.ply"
+
     
     file =  "train-data/0/left-segmented-labelled.ply"
 
@@ -113,3 +114,4 @@ if __name__ == "__main__":
     #     vis.destroy_window()
     # except Exception as e:
     #     logger.error(f"Error processing {file}: {e}")
+

@@ -1,7 +1,7 @@
 # cache folders
 **/__pycache__/
 .vscode/*
-
+.venv/*
 
 # custom folders
 **/o1/** 

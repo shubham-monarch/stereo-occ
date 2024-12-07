@@ -6,6 +6,10 @@ import open3d as o3d
 from tqdm import tqdm
 import numpy as np
 import cv2
+import os
+import fnmatch
+import torch
+from torch.utils.data import Dataset, DataLoader
 
 
 from bev_voxelizer import BevVoxelizer
@@ -13,6 +17,61 @@ from utils.data_generator import pcd_to_segmentation_mask_mono, mono_to_rgb_mask
 from utils.log_utils import get_logger
 
 logger = get_logger("helpers")
+
+
+
+class PointCloudDataset(Dataset):
+    """Custom dataset for loading point clouds."""
+    
+    def __init__(self, data_dir):
+        self.logger = get_logger("PointCloudDataset")
+        self.data_dir = data_dir
+        self.pointcloud_files = self.find_files()
+        
+    def find_files(self):
+        """Recursively find files named 'left-segmented-labelled.ply'."""
+        matches = []
+        for root, _, files in os.walk(self.data_dir):
+            for filename in fnmatch.filter(files, "left-segmented-labelled.ply"):
+                matches.append(os.path.join(root, filename))
+        
+        
+        self.logger.info(f"=================================")
+        self.logger.info(f"Found {len(matches)} point cloud files in {self.data_dir}")
+        self.logger.info(f"=================================\n")
+        
+        return matches
+
+    def load_pointcloud(self, file):
+        """Load a point cloud from a file."""
+        return o3d.t.io.read_point_cloud(file)
+
+    def __len__(self):
+        """Return the total number of point clouds."""
+        return len(self.pointcloud_files)
+
+    def __getitem__(self, idx):
+        """Return a single point cloud as a tensor."""
+        file = self.pointcloud_files[idx]
+        pointcloud = self.load_pointcloud(file)
+
+        # Convert the point cloud to a numpy array and then to a tensor
+        positions = pointcloud.point['positions'].numpy()
+        labels = pointcloud.point['label'].numpy()
+        colors = pointcloud.point['colors'].numpy()
+        
+        self.logger.info(f"=================================")
+        self.logger.info(f"positions.shape: {positions.shape}")
+        self.logger.info(f"labels.shape: {labels.shape}")
+        self.logger.info(f"colors.shape: {colors.shape}")
+        self.logger.info(f"=================================\n")
+
+        # Return as a dictionary or a tuple
+        return {
+            'positions': torch.tensor(positions, dtype=torch.float32),
+            'labels': torch.tensor(labels, dtype=torch.int32),
+            'colors': torch.tensor(colors, dtype=torch.float32)
+        }
 
 def crop_pointcloud(
     pcd_path: str,
@@ -58,8 +117,6 @@ def crop_pointcloud(
     logger.info(f"Cropped point cloud saved to {output_path}")
     logger.info(f"=================================\n")
 
-
-
 # def add_seg_masks_to_dataset(folder_path):
 #     """Recursively find all 'left-segmented-labelled.ply' files in the given folder path."""
     
@@ -95,14 +152,30 @@ def crop_pointcloud(
 #                     pbar.update(1)
 
 
+
+
 if __name__ == "__main__":
-    train_folder = "train-data"
+    # train_folder = "train-data"
     # occ_data_folder = "occ-data"
     
     # CASE 1: 
-    # find_left_segmented_labelled_files(train_folder)
+    # add_seg_masks_to_dataset(train_folder)
 
-    # CASE 2: Crop point clouds and save them to disk
-    src_pcd_path = "train-data/144/left-segmented-labelled.ply"
-    dst_pcd_path = "debug/cropped_pointcloud.ply"
-    crop_pointcloud(src_pcd_path, dst_pcd_path)
+    # # CASE 2: Crop point clouds and save them to disk
+    # src_pcd_path = "train-data/144/left-segmented-labelled.ply"
+    # dst_pcd_path = "debug/cropped_pointcloud.ply"
+    # crop_pointcloud(src_pcd_path, dst_pcd_path)
+
+
+    # CASE 3: Create a dataloader for point clouds
+    dataset = PointCloudDataset(data_dir="train-data")
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+
+    logger.warning(f"=================================")
+    logger.warning(f"Dataloader created with {len(dataloader)} batches")
+    logger.warning(f"=================================\n")
+
+    for idx, batch in enumerate(dataloader):
+        logger.info(f"=================================")
+        logger.info(f"batch {idx}  ==> {batch}")
+        logger.info(f"=================================\n")

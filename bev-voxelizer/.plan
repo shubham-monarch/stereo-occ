@@ -21,3 +21,6 @@
 - use GPU parallelization
 - fix BEV GT resolution
 - BEV GT should be centered
+- remove main.py
+- major refactoring pending
+- remove utils folder
