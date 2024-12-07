@@ -30,21 +30,24 @@ def list_base_folders(folder_path):
 def visualize_pcd(pcd: o3d.t.geometry.PointCloud):
     """Visualize a point cloud using Open3D."""
     
+    if pcd.is_empty():
+        logger.warning("Attempted to visualize an empty point cloud.")
+        return
+        
     vis = o3d.visualization.Visualizer()
     vis.create_window()
-        
-    # Co-ordinate frame for vis window      
+    
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
     vis.add_geometry(coordinate_frame)
-
-    # adding point clouds to visualizer
+    
     vis.add_geometry(pcd.to_legacy())
-        
-    # view_ctr = vis.get_view_control()
-    # view_ctr.set_front(np.array([0, -1, 0]))
-    # view_ctr.set_up(np.array([0, 0, 1]))
-    # view_ctr.set_zoom(0.9)
-        
+    
+    view_ctr = vis.get_view_control()
+    view_ctr.set_front(np.array([0, 0, 1]))  # Adjusted for BEV view
+    view_ctr.set_up(np.array([0, 1, 0]))     # Adjusted for BEV view
+    view_ctr.set_lookat(np.array([0, 0, 0]))
+    view_ctr.set_zoom(4)
+    
     vis.run()
     vis.destroy_window()
 

@@ -57,6 +57,11 @@ if __name__ == "__main__":
 
     # generate BEV
     bev_pcd = bev_generator.generate_BEV(pcd_rectified)
+    
+    logger.info(f"================================================")
+    logger.info(f"Number of points in bev_pcd: {len(bev_pcd.point['positions'].numpy())}")
+    logger.info(f"================================================\n")
+    
     # visualize_pcd(bev_pcd)
 
     # crop BEV
