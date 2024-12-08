@@ -486,47 +486,59 @@ class BEVGenerator:
         # debug_utils.plot_bev_scatter(bev_collection)
 
         return combined_pcd
+    
+    def pcd_to_segmentation_mask_mono(self, pcd: o3d.t.geometry.PointCloud, 
+                                      nx: int = 200, nz: int = 200, 
+                                      bb: dict = None) -> np.ndarray:
+        """
+        Generate a 2D single-channel segmentation mask from a BEV point cloud.
 
-    def pcd_to_segmentation_mask_mono(pcd: o3d.t.geometry.PointCloud, H: int = 480, W: int = 640, bb: dict = None) -> np.ndarray:
-        """2D single-channel segmentation mask from BEV pcd."""
-        # z-axis --> points into the scene is +ve
-        # y-axis --> pointing down is +ve
-        # x-axis --> pointing right is +ve
-
-        assert bb is not None, "Bounding box parameters are required!"
+        :param pcd: Open3D tensor point cloud with labels
+        :param nx: Number of grid cells along the x-axis (horizontal)
+        :param nz: Number of grid cells along the z-axis (vertical)
+        :param bb: Bounding box parameters as a dictionary {'x_min', 'x_max', 'z_min', 'z_max'}
+        :return: Segmentation mask as a 2D numpy array
+        """
         
+        assert bb is not None, "Bounding box parameters are required!"
+        assert nx == nz, "nx and nz must be equal!"
+
+        # Extract bounding box limits
+        x_min, x_max = bb['x_min'], bb['x_max']
+        z_min, z_max = bb['z_min'], bb['z_max']
+
+        # Calculate grid resolution
+        res_x = (x_max - x_min) / nx
+        res_z = (z_max - z_min) / nz
+
+        assert res_x == res_z, "Resolution x and z must be equal!"
+
+        self.logger.info(f"=================================")    
+        self.logger.info(f"Resolution X: {res_x:.2f} meters, Z: {res_z:.2f} meters")
+        self.logger.info(f"=================================\n")
+
+    
         # extract point coordinates and labels
         x_coords = pcd.point['positions'][:, 0].numpy()
         z_coords = pcd.point['positions'][:, 2].numpy()
         labels = pcd.point['label'].numpy()
 
-        x_min, x_max = bb['x_min'], bb['x_max']
-        z_min, z_max = bb['z_min'], bb['z_max']
-
-        # x_scaled = ((x_coords - x_min) / (x_max - x_min) * (W - 1)).astype(np.int32)
-        # z_scaled = ((z_coords - z_min) / (z_max - z_min) * (H - 1)).astype(np.int32)
-
-        # create empty mask
-        mask = np.zeros((H, W), dtype=np.uint8)
-
-        # label mapping (using original label values directly)
-        # 1: Obstacle
-        # 2: Navigable Space
-        # 3: Vine Canopy  
-        # 4: Vine Stem
-        # 5: Vine Pole
-
-        # # fill mask with label values
-        # for x, z, label in zip(x_scaled, z_scaled, labels):
-        #     if 1 <= label <= 5:  # only use valid label values
-        #         mask[z, x] = label
-
-        # fill mask with label values
-        for x, z, label in zip(x_scaled, z_scaled, labels):
-            mask[H - z - 1, x] = label  # invert z to match image coordinates
+        # generate mask_x and mask_z using res_x
+        mask_x = ((x_coords - x_min) / res_x).astype(np.int32)
+        assert mask_x.min() >= 0 and mask_x.max() < nx, "x-indices are out of bounds!"
+        
+        mask_z = nz - 1 - ((z_coords - z_min) / res_z).astype(np.int32)
+        assert mask_z.min() >= 0 and mask_z.max() < nz, "z-indices are out of bounds!"
+        
+        # initialize mask
+        mask = np.zeros((nz, nx), dtype=np.uint8)
+        
+        for x, z, label in zip(mask_x, mask_z, labels):
+            mask[z, x] = label  
 
         return mask
 
+     
 if __name__ == "__main__":
     
     pcd_input = o3d.t.io.read_point_cloud("debug/left-segmented-labelled.ply")

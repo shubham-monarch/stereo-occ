@@ -1,12 +1,12 @@
 #! /usr/bin/env python3
 
 import open3d as o3d
-import matplotlib.pyplot as plt
+import cv2
 
 from bev_generator import BEVGenerator
 from logger import get_logger
 import numpy as np
-from helpers import visualize_pcd
+from helpers import mono_to_rgb_mask
 
 logger = get_logger("debug")
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     logger.info(f"================================================\n")
     
     # cropping params
-    crop_bb = {'x_min': -3, 'x_max': 3, 'z_min': 0, 'z_max': 15}
+    crop_bb = {'x_min': -5, 'x_max': 5, 'z_min': 0, 'z_max': 10}
     
     valid_indices = np.where(
 
@@ -81,8 +81,26 @@ if __name__ == "__main__":
     logger.info(f"Range of z values: {z_values.min()} to {z_values.max()}")
     logger.info(f"================================================\n")
     
-    seg_mask = bev_generator.pcd_to_segmentation_mask_mono(bev_pcd_cropped, bb = crop_bb)
+    seg_mask_mono = bev_generator.pcd_to_segmentation_mask_mono(bev_pcd_cropped, 
+                                                                nx = 400, nz = 400, 
+                                                                bb = crop_bb)
+    seg_mask_rgb = mono_to_rgb_mask(seg_mask_mono)
+    cv2.imshow("seg_mask_rgb", seg_mask_rgb)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
+
+    logger.info(f"================================================")
+    logger.info(f"seg_mask_rgb.shape: {seg_mask_rgb.shape}")
+    logger.info(f"================================================\n")
+
+    output_path = "debug/seg-mask-rgb.png"
+    
+    cv2.imwrite(output_path, seg_mask_rgb)
+
+    logger.info(f"================================================")
+    logger.info(f"Segmentation mask saved to {output_path}")
+    logger.info(f"================================================\n")
 
     # ================================================
     # visualization

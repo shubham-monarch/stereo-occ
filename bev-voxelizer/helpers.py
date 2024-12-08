@@ -27,29 +27,6 @@ def list_base_folders(folder_path):
             base_folders.append(os.path.join(root, dir_name))
     return base_folders
 
-def visualize_pcd(pcd: o3d.t.geometry.PointCloud):
-    """Visualize a point cloud using Open3D."""
-    
-    if pcd.is_empty():
-        logger.warning("Attempted to visualize an empty point cloud.")
-        return
-        
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    
-    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3, origin=[0, 0, 0])
-    vis.add_geometry(coordinate_frame)
-    
-    vis.add_geometry(pcd.to_legacy())
-    
-    view_ctr = vis.get_view_control()
-    view_ctr.set_front(np.array([0, 0, 1]))  # Adjusted for BEV view
-    view_ctr.set_up(np.array([0, 1, 0]))     # Adjusted for BEV view
-    view_ctr.set_lookat(np.array([0, 0, 0]))
-    view_ctr.set_zoom(4)
-    
-    vis.run()
-    vis.destroy_window()
 
 def get_label_colors_from_yaml(yaml_path=None):
     """Read label colors from Mavis.yaml config file."""
