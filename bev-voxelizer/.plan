@@ -47,12 +47,12 @@
 - z / y swap 
 - fix label merging strategy in pcd_to_seg_mask_mono
 
-- fix compute_tilt_matrix --> align with x and z-axis as well  
-- need to align two axes instead of one
-- [debug] align x and z, and y should automatically align
+* fix compute_tilt_matrix --> align with x and z-axis as well  
+* need to align two axes instead of one
+* [debug] align x and z, and y should automatically align
 
 - generate camera extrinsics as part of dataset
-- why is normal not completely aligning with the y-axis? 
+* why is normal not completely aligning with the y-axis? 
 
 - add test.py
 - change co-ordinate frame to align with the sbevnet axes
@@ -60,7 +60,3 @@
 - sbvenet with only [canopy + navigable-space] as output
 
 
-x --> [-3, 3] --> 6m
-z --> [0, 15] --> 15m
-
-seg-map --> 500 * 500 
