@@ -77,42 +77,22 @@ def count_unique_labels(mask_img: np.ndarray):
     
     return len(unique_colors), unique_colors
 
-def crop_pointcloud(
-    src_pcd: o3d.t.geometry.PointCloud,
-    output_path: str
-) -> None:
-    """Crop a point cloud to a specified area and save it to disk."""
+def crop_pcd(pcd: o3d.t.geometry.PointCloud, bb: dict = None) -> o3d.t.geometry.PointCloud:
+    """Crop a point cloud to a specified area."""
     
-    logger.info(f"=================================")
-    logger.info(f"Cropping point cloud to {output_path}")
-    logger.info(f"=================================\n")
-
-    # Extract point coordinates and labels
-    x_coords = src_pcd.point['positions'][:, 0].numpy()
-    y_coords = src_pcd.point['positions'][:, 1].numpy()
-    z_coords = src_pcd.point['positions'][:, 2].numpy()
-    labels = src_pcd.point['label'].numpy()
-    colors = src_pcd.point['colors'].numpy()
-
-    # Crop points to 20m x 10m area
     valid_indices = np.where(
-        (z_coords >= 0) & (z_coords <= 5)
+
+        # x between x_min and x_max
+        (pcd.point['positions'][:, 0].numpy() >= bb['x_min']) & 
+        (pcd.point['positions'][:, 0].numpy() <= bb['x_max']) & 
+
+        # z between z_min and z_max
+        (pcd.point['positions'][:, 2].numpy() >= bb['z_min']) & 
+        (pcd.point['positions'][:, 2].numpy() <= bb['z_max'])
+
     )[0]
 
-    x_coords = x_coords[valid_indices]
-    y_coords = y_coords[valid_indices]
-    z_coords = z_coords[valid_indices]
-    labels = labels[valid_indices]
-    colors = colors[valid_indices]
-
-    # Create a new point cloud with the cropped points
-    cropped_pcd = o3d.t.geometry.PointCloud()
-    cropped_pcd.point['positions'] = o3d.core.Tensor(np.column_stack((x_coords, y_coords, z_coords)), dtype=o3d.core.Dtype.Float32)
-    cropped_pcd.point['label'] = o3d.core.Tensor(labels, dtype=o3d.core.Dtype.UInt8)
-    cropped_pcd.point['colors'] = o3d.core.Tensor(colors, dtype=o3d.core.Dtype.UInt8)
-    
-    o3d.t.io.write_point_cloud(output_path, cropped_pcd)
-    logger.info(f"Cropped point cloud saved to {output_path}")
+    return pcd.select_by_index(valid_indices)
 
 
 # def add_seg_masks_to_dataset(src_folder: str, dst_folder: str = None):

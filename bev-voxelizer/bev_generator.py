@@ -6,9 +6,10 @@ import numpy as np
 import open3d.core as o3c
 from scipy.spatial import cKDTree
 from typing import List, Tuple, Optional
-from logger import get_logger
-
 import torch
+
+from helpers import crop_pcd, mono_to_rgb_mask
+from logger import get_logger
 
 class BEVGenerator:
     def __init__(self):
@@ -487,7 +488,7 @@ class BEVGenerator:
 
         return combined_pcd
     
-    def pcd_to_segmentation_mask_mono(self, pcd: o3d.t.geometry.PointCloud, 
+    def bev_to_seg_mask_mono(self, pcd: o3d.t.geometry.PointCloud, 
                                       nx: int = 200, nz: int = 200, 
                                       bb: dict = None) -> np.ndarray:
         """
@@ -538,11 +539,21 @@ class BEVGenerator:
 
         return mask
 
-     
-if __name__ == "__main__":
     
-    pcd_input = o3d.t.io.read_point_cloud("debug/left-segmented-labelled.ply")
-    
-    bev_generator = BEVGenerator()
-    bev_pcd = bev_generator.generate_BEV(pcd_input)
+    def pcd_to_seg_mask_mono(self, 
+                             pcd: o3d.t.geometry.PointCloud, 
+                             nx: int = None, nz: int = None, 
+                             bb: dict = None) -> Tuple[np.ndarray, np.ndarray]:
+        
+        '''Generate mono / rgb segmentation masks from a pointcloud'''        
+        assert bb is not None, "Bounding box parameters are required!"
+        assert nx is not None and nz is not None, "nx and nz must be provided!"
+        
+        bev_pcd = self.generate_BEV(pcd)
+        bev_pcd_cropped = crop_pcd(bev_pcd, bb)
+
+        seg_mask_mono = self.bev_to_seg_mask_mono(bev_pcd_cropped, nx, nz, bb)
+        seg_mask_rgb = mono_to_rgb_mask(seg_mask_mono)
+
+        return seg_mask_mono, seg_mask_rgb
     
