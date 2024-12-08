@@ -25,13 +25,16 @@
     * use CPU parallelization
 
 - get decent baseline results
+- time the dataset generation step
 
 - fix BEV GT data
 
 - BEV GT should be centered
 - BEV GT should not have black regions
 - BEV GT should have fixed resolution across files
-    
+- input image rectification
+
+
 - fix camera extrinsics 
 
 - need to shift z as well
@@ -39,6 +42,7 @@
 - normalize plane normal --> [a,b,c,d]
 - BEV projection was shifted along y. 
 - [debug] project pointcloud to camera to check camera extrinsics
+- transpose effect
 
 - fix compute_tilt_matrix --> align with x and z-axis as well  
 - need to align two axes instead of one
@@ -49,6 +53,11 @@
 
 - add test.py
 - change co-ordinate frame to align with the sbevnet axes
-- time the dataset generation step
 - update generate-train-data.py
 - sbvenet with only [canopy + navigable-space] as output
+
+
+x --> [-3, 3] --> 6m
+z --> [0, 15] --> 15m
+
+seg-map --> 500 * 500 

@@ -487,33 +487,24 @@ class BEVGenerator:
 
         return combined_pcd
 
-    def pcd_to_segmentation_mask_mono(pcd: o3d.t.geometry.PointCloud, H: int = 480, W: int = 640) -> np.ndarray:
-        """2D segmentation mask from BEV pcd."""
+    def pcd_to_segmentation_mask_mono(pcd: o3d.t.geometry.PointCloud, H: int = 480, W: int = 640, bb: dict = None) -> np.ndarray:
+        """2D single-channel segmentation mask from BEV pcd."""
         # z-axis --> points into the scene is +ve
         # y-axis --> pointing down is +ve
         # x-axis --> pointing right is +ve
+
+        assert bb is not None, "Bounding box parameters are required!"
         
         # extract point coordinates and labels
         x_coords = pcd.point['positions'][:, 0].numpy()
         z_coords = pcd.point['positions'][:, 2].numpy()
         labels = pcd.point['label'].numpy()
 
-        # crop points to 20m x 10m area
-        valid_indices = np.where(
-            (x_coords >= -10) & (x_coords <= 10) & 
-            (z_coords >= 0) & (z_coords <= 20)
-        )[0]
+        x_min, x_max = bb['x_min'], bb['x_max']
+        z_min, z_max = bb['z_min'], bb['z_max']
 
-        x_coords = x_coords[valid_indices]
-        z_coords = z_coords[valid_indices]
-        labels = labels[valid_indices]
-
-        # scale coordinates to image dimensions
-        x_min, x_max = x_coords.min(), x_coords.max()
-        z_min, z_max = z_coords.min(), z_coords.max()
-
-        x_scaled = ((x_coords - x_min) / (x_max - x_min) * (W - 1)).astype(np.int32)
-        z_scaled = ((z_coords - z_min) / (z_max - z_min) * (H - 1)).astype(np.int32)
+        # x_scaled = ((x_coords - x_min) / (x_max - x_min) * (W - 1)).astype(np.int32)
+        # z_scaled = ((z_coords - z_min) / (z_max - z_min) * (H - 1)).astype(np.int32)
 
         # create empty mask
         mask = np.zeros((H, W), dtype=np.uint8)
