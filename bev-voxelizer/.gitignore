@@ -1,2 +1,4 @@
 build/*
 occ-data/*
+data/*
+train-data/*
