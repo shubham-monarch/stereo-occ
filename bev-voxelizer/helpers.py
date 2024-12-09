@@ -128,16 +128,3 @@ def crop_pcd(pcd: o3d.t.geometry.PointCloud, bb: dict = None) -> o3d.t.geometry.
 #                     cv2.imwrite(seg_mask_rgb_path, seg_mask_rgb)
                     
 #                     pbar.update(1)
-
-
-
-
-if __name__ == "__main__":
-    # train_folder = "train-data"
-    # occ_data_folder = "occ-data"
-    
-    # CASE 1: 
-    # add_seg_masks_to_dataset(train_folder)
-
-    # CASE 2: 
-    pass
