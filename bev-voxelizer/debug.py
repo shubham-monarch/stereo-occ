@@ -14,7 +14,7 @@ from read_write_model import qvec2rotmat, read_images_binary
 
 logger = get_logger("debug")
 
-def calculate_rotation_matrix(vector):
+def get_R(vector):
     # Step 1: Normalize the vector
     a, b, c = vector
     norm = np.sqrt(a**2 + b**2 + c**2)
@@ -34,9 +34,16 @@ def calculate_rotation_matrix(vector):
     
     return rotation_matrix
 
-def project_points_with_cv2(points, camera_matrix, image_size):
-    ''' Project points to camera '''
-    projected_points, _ = cv2.projectPoints(points, rvec=np.zeros((3, 1)), tvec=np.zeros((3, 1)), 
+def project_pcd_to_camera(pcd_input, camera_matrix, image_size, rvec=None, tvec=None):
+    ''' Project pointcloud to camera '''
+    
+    assert rvec is not None, "rvec must be provided"
+    assert tvec is not None, "tvec must be provided"
+    
+    points = pcd_input.point['positions'].numpy()
+    colors = pcd_input.point['colors'].numpy()  # Extract 
+    
+    projected_points, _ = cv2.projectPoints(points, rvec=rvec, tvec=tvec, 
                                              cameraMatrix=camera_matrix, distCoeffs=None)
 
     projected_points = projected_points.reshape(-1, 2)
@@ -48,19 +55,13 @@ def project_points_with_cv2(points, camera_matrix, image_size):
         if 0 <= x < img.shape[1] and 0 <= y < img.shape[0]:
             color_bgr = (int(color[2]), int(color[1]), int(color[0]))
             cv2.circle(img, (x, y), 3, color_bgr, -1)
-            # 
-            # if idx == 0:
-                # logger.info(f"================================================")
-                # logger.info(f"color: {color}")
-                # logger.info(f"color_bgr: {color_bgr}")
-                # logger.info(f"================================================\n")
-            # 
-    cv2.imshow("Projected Points", img)
-    while True:
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    cv2.destroyAllWindows()
-
+    
+    # cv2.imshow("Projected Points", img)
+    # while True:
+    #     if cv2.waitKey(1) & 0xFF == ord('q'):
+    #         break
+    # cv2.destroyAllWindows()
+    return img
 
 
 if __name__ == "__main__":  
@@ -71,88 +72,62 @@ if __name__ == "__main__":
     
     bev_generator = BEVGenerator()
     ground_id = bev_generator.LABELS["NAVIGABLE_SPACE"]["id"]
+    camera_matrix = np.array([[1093.2768, 0, 964.989],
+                               [0, 1093.2768, 569.276],
+                               [0, 0, 1]], dtype=np.float32)
     
     pcd_input = o3d.t.io.read_point_cloud("debug/left-segmented-labelled.ply")
     pcd_rectified = bev_generator.tilt_rectification(pcd_input)
-
-    camera_matrix = np.array([[1093.2768, 0, 964.989],
-                               [0, 1093.2768, 569.276],
-                               [0, 0, 1]], dtype=np.float32)  # Replace fx, fy, cx, cy with actual camera parameters
-
-    # Extract point cloud positions
-    points = pcd_input.point['positions'].numpy()
-    colors = pcd_input.point['colors'].numpy()  # Extract colors
-
-    # projected_points = project_points_with_cv2(points, camera_matrix, (1920, 1080))
-   
-  
-
-    # # Convert projected points to 2D
-    # projected_points_2d = projected_points.reshape(-1, 2)
-    # logger.info(f"Projected Points: {projected_points_2d}")
-
-
-    # # normal vectors
-    # n_i, _ = bev_generator.get_class_plane(pcd_input, ground_id)
-    # n_f, _ = bev_generator.get_class_plane(pcd_rectified, ground_id)
-
-    # # axis angles
-    # axis_angles_i = bev_generator.axis_angles(n_i)
-    # axis_angles_f = bev_generator.axis_angles(n_f)
     
-    # logger.info(f"================================================")    
-    # logger.info(f"axis_angles_i: {axis_angles_i}")
-    # logger.info(f"axis_angles_f: {axis_angles_f}")
-    # logger.info(f"================================================\n")
+    R = bev_generator.compute_tilt_matrix(pcd_input)
 
-
-    # # rotation matrix
-    # # R_i, _ = cv2.Rodrigues(np.array([axis_angles_i[0], axis_angles_i[1], axis_angles_i[2]]))
-    # # R_f, _ = cv2.Rodrigues(np.array([axis_angles_f[0], axis_angles_f[1], axis_angles_f[2]]))
+    yaw_i, pitch_i, roll_i = bev_generator.rotation_matrix_to_ypr(R)
     
-    # # yaw, pitch, roll
-    # exit()
+    logger.info(f"================================================")
+    logger.info(f"yaw_i: {yaw_i}, pitch_i: {pitch_i}, roll_i: {roll_i}")
+    logger.info(f"================================================\n")
+
+    is_orthogonal = np.allclose(np.dot(R.T, R), np.eye(3), atol=1e-6)
+
+    logger.info(f"================================================")
+    logger.info(f"Is the rotation matrix orthogonal? {is_orthogonal}")
+    logger.info(f"================================================\n")
+
+    R_transpose = R.T
+    # logger.info(f"Transpose of R: \n{R_transpose}")
+    yaw_f, pitch_f, roll_f = bev_generator.rotation_matrix_to_ypr(R_transpose)
+    
+    logger.info(f"================================================")
+    logger.info(f"R_transpose.shape: {R_transpose.shape}")
+    logger.info(f"yaw_f: {yaw_f}, pitch_f: {pitch_f}, roll_f: {roll_f}")
+    logger.info(f"================================================\n")
+
+    R_transpose_4x4 = np.eye(4)
+    R_transpose_4x4[:3, :3] = R_transpose
+
+    T_cam_world_i = np.eye(4)
+    T_cam_world_i = T_cam_world_i @ R_transpose_4x4
 
     # logger.info(f"================================================")
-    # logger.info(f"x_i: {x_i:.2f}, y_i: {y_i:.2f}, z_i: {z_i:.2f}")
-    # logger.info(f"y_i: {y_i:.2f}, p_i: {p_i:.2f}, r_i: {r_i:.2f}")
+    # logger.info(f"T_cam_world_i: \n{T_cam_world_i}")
     # logger.info(f"================================================\n")
+    
+    img_i = project_pcd_to_camera(pcd_input, camera_matrix, (1920, 1080), rvec=np.zeros((3, 1)), tvec=np.zeros((3, 1)))
+    
+    rvec, _ = cv2.Rodrigues(R_transpose)
+    img_f = project_pcd_to_camera(pcd_rectified, camera_matrix, (1920, 1080), rvec=rvec, tvec=np.zeros((3, 1)))
 
-    # # [pitch, yaw, roll] calculations for n2
-    # x_f, y_f, z_f = bev_generator.axis_angles(n_f)
-    # R_f, _ = cv2.Rodrigues(np.array([x_f, y_f, z_f]))
-    # y_f, p_f, r_f = bev_generator.rotation_matrix_to_ypr(R_f)
-
+    # # [img_i vs img_f]
+    # # difference = cv2.absdiff(img_i, img_f)
+    # mse = np.mean((img_i - img_f) ** 2)
     # logger.info(f"================================================")
-    # logger.info(f"x_f: {x_f:.2f}, y_f: {y_f:.2f}, z_f: {z_f:.2f}")
-    # logger.info(f"y_f: {y_f:.2f}, p_f: {p_f:.2f}, r_f: {r_f:.2f}")
+    # logger.info(f"Difference between img_i and img_f: \n{mse}")
     # logger.info(f"================================================\n")
 
-    # exit()
-    # T_i = np.eye(4)
-    # T_i[:3, :3] = R_i
-    # T_i[:3, 3] = [0.0, 0, 1]
 
-    # T_f = np.eye(4)
-    # T_f[:3, :3] = R_f
-    # T_f[:3, 3] = [0.0, 0, 1]
-   
-    # T = np.linalg.inv(T_f) @ T_i
 
-    # # logger.info(f"================================================")
-    # # logger.info(f"T: {T}")
-    # # logger.info(f"================================================\n")
 
-    # R = T[:3, :3]
 
-    # rvec, _ = cv2.Rodrigues(R)
-    # p, y, r = rvec.flatten()
-
-    # p, y, r = np.degrees([p, y, r])
-
-    # logger.info(f"================================================")
-    # logger.info(f"p: {p:.2f}, y: {y:.2f}, r: {r:.2f}")
-    # logger.info(f"================================================\n")
 
     # ================================================
     # CASE 5: check image size
