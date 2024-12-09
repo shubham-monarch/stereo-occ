@@ -59,4 +59,6 @@
 - update generate-train-data.py
 - sbvenet with only [canopy + navigable-space] as output
 
+- fix yaw / axis-angle logs in bev-generator
+
 

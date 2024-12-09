@@ -13,7 +13,9 @@ import logging
 import sys
 import coloredlogs
 import yaml
+import pyzed.sl as sl
 import matplotlib.pyplot as plt
+from read_write_model import qvec2rotmat
 
 from logger import get_logger
 
@@ -61,6 +63,31 @@ def mono_to_rgb_mask(mono_mask: np.ndarray, yaml_path: str = "Mavis.yaml") -> np
     return rgb_mask
 
 
+def get_zed_camera_params(svo_loc):
+    
+    zed_file_path = os.path.abspath(svo_loc)
+    print(f"zed_file_path: {zed_file_path}")
+
+    input_type = sl.InputType()
+    input_type.set_from_svo_file(zed_file_path)
+    init = sl.InitParameters(input_t=input_type, svo_real_time_mode=False)
+    init.coordinate_units = sl.UNIT.METER   
+
+    zed = sl.Camera()
+    status = zed.open(init)
+    if status != sl.ERROR_CODE.SUCCESS:
+        print(repr(status))
+        exit()
+
+
+    calibration_params = zed.get_camera_information().camera_configuration.calibration_parameters
+    zed_camera_params = [calibration_params.left_cam.fx, calibration_params.left_cam.fy, calibration_params.left_cam.cx, calibration_params.left_cam.cy, 0, 0 ,0 , 0]
+    
+    #print(f"zed_camera_params: {zed_camera_params}")
+    camera_params= ",".join(str(x) for x in zed_camera_params)
+
+    return camera_params
+
 def count_unique_labels(mask_img: np.ndarray):
     """Count and return the number of unique labels in a segmented mask image."""
     
@@ -76,6 +103,20 @@ def count_unique_labels(mask_img: np.ndarray):
     unique_colors = np.unique(mask_flat, axis=0)
     
     return len(unique_colors), unique_colors
+
+def R_to_rvec(R: np.ndarray) -> np.ndarray:
+    """Convert rotation matrix to rotation vector."""
+    rvec, _ = cv2.Rodrigues(R)
+    return rvec
+
+def cam_extrinsics(img):
+    R = qvec2rotmat(img.qvec)
+    t = img.tvec.reshape(3,-1)
+    #print(f"R: {R} t: {t}")
+    R_t = np.concatenate((R,t), axis = 1)
+    #R_t = np.vstack([np.array([0,0,0,1]), R_t])
+    R_t = np.vstack([R_t, np.array([0,0,0,1])])
+    return R_t    #  4 * 4 matrix
 
 def crop_pcd(pcd: o3d.t.geometry.PointCloud, bb: dict = None) -> o3d.t.geometry.PointCloud:
     """Crop a point cloud to a specified area."""
