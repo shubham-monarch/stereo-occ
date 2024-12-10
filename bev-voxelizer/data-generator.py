@@ -13,7 +13,6 @@ from logger import get_logger
 from bev_generator import BEVGenerator
 
 
-
 class DataGenerator:
     '''Class to generate training data for the SBEVNet model'''
     
@@ -22,7 +21,8 @@ class DataGenerator:
  
 
     def s3_data_to_model_data(self, s3_data_dir = None, model_data_dir = None):
-        
+        '''Process s3 data and move to model-data folder'''
+
         assert s3_data_dir is not None, "s3_data_dir is required"
         assert model_data_dir is not None, "model_data_dir is required"
 
@@ -87,8 +87,6 @@ class DataGenerator:
                     except Exception as e:
                         self.logger.error(f"Failed to process {file}: {str(e)}")
                         continue
-
-    
 
 
     def fetch_data_from_s3(self, s3_uri, local_dir):
