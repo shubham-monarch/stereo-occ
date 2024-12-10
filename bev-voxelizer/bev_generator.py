@@ -23,8 +23,10 @@ class BEVGenerator:
             "VINE_STEM": {"id": 4, "priority": 4},  
             "NAVIGABLE_SPACE": {"id": 2, "priority": 5},  
         }
-
+        
+        self.R = None
         self.logger = get_logger("bev_generator", level=logging.ERROR)
+
     
     def filter_radius_outliers(self, pcd: o3d.t.geometry.PointCloud, nb_points: int, search_radius: float):
         '''
@@ -215,7 +217,7 @@ class BEVGenerator:
         Tilt rectification for the input pointcloud
         '''
         R = self.compute_tilt_matrix(pcd_input)
-            
+        self.R = R
         yaw, pitch, roll = self.rotation_matrix_to_ypr(R)
 
         # sanity check
@@ -538,8 +540,7 @@ class BEVGenerator:
             mask[z, x] = label  
 
         return mask
-
-    
+  
     def pcd_to_seg_mask_mono(self, 
                              pcd: o3d.t.geometry.PointCloud, 
                              nx: int = None, nz: int = None, 
@@ -556,4 +557,10 @@ class BEVGenerator:
         seg_mask_rgb = mono_to_rgb_mask(seg_mask_mono)
 
         return seg_mask_mono, seg_mask_rgb
-    
+
+    def get_updated_camera_extrinsics(self, pcd: o3d.t.geometry.PointCloud) -> np.ndarray:
+        '''Get updated camera extrinsics after tilting the pointcloud'''
+        T = np.eye(4)
+        R = self.R.T
+        T[:3, :3] = R
+        return T

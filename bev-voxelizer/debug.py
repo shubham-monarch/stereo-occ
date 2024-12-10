@@ -80,13 +80,12 @@ if __name__ == "__main__":
     pcd_rectified = bev_generator.tilt_rectification(pcd_input)
     
     R = bev_generator.compute_tilt_matrix(pcd_input)
-
     yaw_i, pitch_i, roll_i = bev_generator.rotation_matrix_to_ypr(R)
     
     logger.info(f"================================================")
     logger.info(f"yaw_i: {yaw_i}, pitch_i: {pitch_i}, roll_i: {roll_i}")
     logger.info(f"================================================\n")
-
+    
     is_orthogonal = np.allclose(np.dot(R.T, R), np.eye(3), atol=1e-6)
 
     logger.info(f"================================================")
