@@ -116,17 +116,6 @@ if __name__ == "__main__":
     rvec, _ = cv2.Rodrigues(R_transpose)
     img_f = project_pcd_to_camera(pcd_rectified, camera_matrix, (1920, 1080), rvec=rvec, tvec=np.zeros((3, 1)))
 
-    # # [img_i vs img_f]
-    # # difference = cv2.absdiff(img_i, img_f)
-    # mse = np.mean((img_i - img_f) ** 2)
-    # logger.info(f"================================================")
-    # logger.info(f"Difference between img_i and img_f: \n{mse}")
-    # logger.info(f"================================================\n")
-
-
-
-
-
 
     # ================================================
     # CASE 5: check image size
