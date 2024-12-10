@@ -21,8 +21,8 @@
 + remove utils folder
 
 * make [pcd-segmented to bev-segmented pipeline] fast
-    * use GPU parallelization
-    * use CPU parallelization
+* use GPU parallelization
+* use CPU parallelization
 
 - get decent baseline results
 * time the dataset generation step
