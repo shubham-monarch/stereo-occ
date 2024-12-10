@@ -2,3 +2,5 @@ build/*
 occ-data/*
 data/*
 train-data/*
+aws-data/* 
+model-data/*

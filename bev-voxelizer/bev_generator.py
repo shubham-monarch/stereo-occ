@@ -541,7 +541,7 @@ class BEVGenerator:
 
         return mask
   
-    def pcd_to_seg_mask_mono(self, 
+    def pcd_to_seg_mask(self, 
                              pcd: o3d.t.geometry.PointCloud, 
                              nx: int = None, nz: int = None, 
                              bb: dict = None) -> Tuple[np.ndarray, np.ndarray]:
@@ -560,6 +560,8 @@ class BEVGenerator:
 
     def get_updated_camera_extrinsics(self, pcd: o3d.t.geometry.PointCloud) -> np.ndarray:
         '''Get updated camera extrinsics after tilting the pointcloud'''
+        
+        assert self.R is not None, "Rotation matrix is required!"
         T = np.eye(4)
         R = self.R.T
         T[:3, :3] = R

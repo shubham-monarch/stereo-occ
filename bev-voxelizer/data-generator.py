@@ -6,8 +6,11 @@ import os
 import random
 from tqdm import tqdm
 import shutil
+import open3d as o3d
+import cv2
 
 from logger import get_logger
+from bev_generator import BEVGenerator
 
 
 
@@ -16,42 +19,81 @@ class DataGenerator:
     
     def __init__(self):
         self.logger = get_logger("data-generator")
-
-
-    def copy_images(self, src_dir, dst_dir):
-         # Create model data directory if it doesn't exist
-        os.makedirs(dst_dir, exist_ok=True)
-        
-        # Walk through s3 data directory
-        for root, dirs, files in os.walk(src_dir):
-            for file in files:
-                if file in ['left.jpg', 'right.jpg']:
-                    # Get relative path from s3_data_dir
-                    rel_path = os.path.relpath(root, src_dir)
-                    
-                    # Create corresponding directory in model_data_dir
-                    dest_dir = os.path.join(dst_dir, rel_path)
-                    os.makedirs(dest_dir, exist_ok=True)
-                    
-                    # Copy file
-                    src_file = os.path.join(root, file)
-                    dest_file = os.path.join(dest_dir, file)
-                    shutil.copy2(src_file, dest_file)
-
+ 
 
     def s3_data_to_model_data(self, s3_data_dir = None, model_data_dir = None):
-        '''Copy left and right images from s3 data to model data directory'''
         
         assert s3_data_dir is not None, "s3_data_dir is required"
         assert model_data_dir is not None, "model_data_dir is required"
 
-        self.copy_images(s3_data_dir, model_data_dir)    
+        # walk through s3 data directory
+        for root, dirs, files in os.walk(s3_data_dir):
+            for file in files:
+                if file == 'left-segmented-labelled.ply':
+                    try:
+                        
+                        file_path = os.path.join(root, file)
+                        pcd_input = o3d.t.io.read_point_cloud(file_path)
+                    
+                        bev_generator = BEVGenerator()
+                    
+                        # mask dimensions (400 * 400)
+                        nx , ny = 400, 400
+                        
+                        # crop bounding box
+                        crop_bb = {'x_min': -5, 'x_max': 5, 'z_min': 0, 'z_max': 10}
+
+                        # mono / rgb segmentation masks
+                        seg_mask_mono, seg_mask_rgb = bev_generator.pcd_to_seg_mask(pcd_input,
+                                                                                    nx, ny,
+                                                                                    crop_bb)
+                        
+                        # camera extrinsics
+                        camera_extrinsics = bev_generator.get_updated_camera_extrinsics(pcd_input)
+
+                        rel_path = os.path.relpath(root, s3_data_dir)
+                        dest_dir = os.path.join(model_data_dir, rel_path)
+                        os.makedirs(dest_dir, exist_ok=True)
+                        
+                        # ================================================
+                        # copy left and right images
+                        # ================================================
+                        for img_file in ['left.jpg', 'right.jpg']:
+                            try:
+                                src_file = os.path.join(root, img_file)
+                                if os.path.exists(src_file):
+                                    dest_file = os.path.join(dest_dir, img_file)
+                                    shutil.copy2(src_file, dest_file)
+                            except (IOError, OSError) as e:
+                                self.logger.error(f"Failed to copy {img_file}: {str(e)}")
+
+                        # ================================================
+                        # save segmentation masks
+                        # ================================================
+                        try:
+                            cv2.imwrite(os.path.join(dest_dir, 'seg_mask_mono.png'), seg_mask_mono)
+                            cv2.imwrite(os.path.join(dest_dir, 'seg_mask_rgb.png'), seg_mask_rgb)
+                        except Exception as e:
+                            self.logger.error(f"Failed to save segmentation masks: {str(e)}")
+
+                        # ================================================
+                        # save camera extrinsics
+                        # ================================================
+                        try:
+                            np.save(os.path.join(dest_dir, 'cam_extrinsics.npy'), camera_extrinsics)
+                        except Exception as e:
+                            self.logger.error(f"Failed to save camera extrinsics: {str(e)}")
+                            
+                    except Exception as e:
+                        self.logger.error(f"Failed to process {file}: {str(e)}")
+                        continue
+
     
 
 
-        
-
     def fetch_data_from_s3(self, s3_uri, local_dir):
+        '''Fetch data from s3 and save to local directory'''
+        
         s3 = boto3.resource('s3')
         bucket_name, prefix = s3_uri.replace("s3://", "").split("/", 1)
         bucket = s3.Bucket(bucket_name)
@@ -92,7 +134,10 @@ if __name__ == "__main__":
     
     data_generator = DataGenerator()
     
-    # s3_uri = "s3://occupancy-dataset/occ-dataset/vineyards/RJM/"
-    # data_generator.fetch_data_from_s3(s3_uri, "aws-data")
+    s3_uri = "s3://occupancy-dataset/occ-dataset/vineyards/RJM/"
 
+    # fetch data from s3
+    data_generator.fetch_data_from_s3(s3_uri, "aws-data")
+
+    # process s3 data and move to model-data folder
     data_generator.s3_data_to_model_data("aws-data", "model-data")

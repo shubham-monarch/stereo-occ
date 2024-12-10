@@ -14,25 +14,7 @@ from read_write_model import qvec2rotmat, read_images_binary
 
 logger = get_logger("debug")
 
-def get_R(vector):
-    # Step 1: Normalize the vector
-    a, b, c = vector
-    norm = np.sqrt(a**2 + b**2 + c**2)
-    v_norm = np.array([a, b, c]) / norm
-    
-    # Step 2: Calculate the angles between the vector and the coordinate axes
-    cos_theta_x = v_norm[0]
-    cos_theta_y = v_norm[1]
-    cos_theta_z = v_norm[2]
-    
-    # Step 3: Create the rotation matrix
-    rotation_matrix = np.array([
-        [cos_theta_x, cos_theta_y, cos_theta_z],
-        [cos_theta_x, cos_theta_y, cos_theta_z],
-        [cos_theta_x, cos_theta_y, cos_theta_z]
-    ])
-    
-    return rotation_matrix
+
 
 def project_pcd_to_camera(pcd_input, camera_matrix, image_size, rvec=None, tvec=None):
     ''' Project pointcloud to camera '''
@@ -66,55 +48,57 @@ def project_pcd_to_camera(pcd_input, camera_matrix, image_size, rvec=None, tvec=
 
 if __name__ == "__main__":  
      
+    pass
+    
     # ================================================
     # CASE 6: testing bev_generator.updated_camera_extrinsics()
     # ================================================
     
-    bev_generator = BEVGenerator()
-    ground_id = bev_generator.LABELS["NAVIGABLE_SPACE"]["id"]
-    camera_matrix = np.array([[1093.2768, 0, 964.989],
-                               [0, 1093.2768, 569.276],
-                               [0, 0, 1]], dtype=np.float32)
+    # bev_generator = BEVGenerator()
+    # ground_id = bev_generator.LABELS["NAVIGABLE_SPACE"]["id"]
+    # camera_matrix = np.array([[1093.2768, 0, 964.989],
+    #                            [0, 1093.2768, 569.276],
+    #                            [0, 0, 1]], dtype=np.float32)
     
-    pcd_input = o3d.t.io.read_point_cloud("debug/left-segmented-labelled.ply")
-    pcd_rectified = bev_generator.tilt_rectification(pcd_input)
+    # pcd_input = o3d.t.io.read_point_cloud("debug/left-segmented-labelled.ply")
+    # pcd_rectified = bev_generator.tilt_rectification(pcd_input)
     
-    R = bev_generator.compute_tilt_matrix(pcd_input)
-    yaw_i, pitch_i, roll_i = bev_generator.rotation_matrix_to_ypr(R)
+    # R = bev_generator.compute_tilt_matrix(pcd_input)
+    # yaw_i, pitch_i, roll_i = bev_generator.rotation_matrix_to_ypr(R)
     
-    logger.info(f"================================================")
-    logger.info(f"yaw_i: {yaw_i}, pitch_i: {pitch_i}, roll_i: {roll_i}")
-    logger.info(f"================================================\n")
+    # logger.info(f"================================================")
+    # logger.info(f"yaw_i: {yaw_i}, pitch_i: {pitch_i}, roll_i: {roll_i}")
+    # logger.info(f"================================================\n")
     
-    is_orthogonal = np.allclose(np.dot(R.T, R), np.eye(3), atol=1e-6)
+    # is_orthogonal = np.allclose(np.dot(R.T, R), np.eye(3), atol=1e-6)
 
-    logger.info(f"================================================")
-    logger.info(f"Is the rotation matrix orthogonal? {is_orthogonal}")
-    logger.info(f"================================================\n")
+    # logger.info(f"================================================")
+    # logger.info(f"Is the rotation matrix orthogonal? {is_orthogonal}")
+    # logger.info(f"================================================\n")
 
-    R_transpose = R.T
-    # logger.info(f"Transpose of R: \n{R_transpose}")
-    yaw_f, pitch_f, roll_f = bev_generator.rotation_matrix_to_ypr(R_transpose)
+    # R_transpose = R.T
+    # # logger.info(f"Transpose of R: \n{R_transpose}")
+    # yaw_f, pitch_f, roll_f = bev_generator.rotation_matrix_to_ypr(R_transpose)
     
-    logger.info(f"================================================")
-    logger.info(f"R_transpose.shape: {R_transpose.shape}")
-    logger.info(f"yaw_f: {yaw_f}, pitch_f: {pitch_f}, roll_f: {roll_f}")
-    logger.info(f"================================================\n")
+    # logger.info(f"================================================")
+    # logger.info(f"R_transpose.shape: {R_transpose.shape}")
+    # logger.info(f"yaw_f: {yaw_f}, pitch_f: {pitch_f}, roll_f: {roll_f}")
+    # logger.info(f"================================================\n")
 
-    R_transpose_4x4 = np.eye(4)
-    R_transpose_4x4[:3, :3] = R_transpose
+    # R_transpose_4x4 = np.eye(4)
+    # R_transpose_4x4[:3, :3] = R_transpose
 
-    T_cam_world_i = np.eye(4)
-    T_cam_world_i = T_cam_world_i @ R_transpose_4x4
+    # T_cam_world_i = np.eye(4)
+    # T_cam_world_i = T_cam_world_i @ R_transpose_4x4
 
     # logger.info(f"================================================")
     # logger.info(f"T_cam_world_i: \n{T_cam_world_i}")
     # logger.info(f"================================================\n")
     
-    img_i = project_pcd_to_camera(pcd_input, camera_matrix, (1920, 1080), rvec=np.zeros((3, 1)), tvec=np.zeros((3, 1)))
+    # img_i = project_pcd_to_camera(pcd_input, camera_matrix, (1920, 1080), rvec=np.zeros((3, 1)), tvec=np.zeros((3, 1)))
     
-    rvec, _ = cv2.Rodrigues(R_transpose)
-    img_f = project_pcd_to_camera(pcd_rectified, camera_matrix, (1920, 1080), rvec=rvec, tvec=np.zeros((3, 1)))
+    # rvec, _ = cv2.Rodrigues(R_transpose)
+    # img_f = project_pcd_to_camera(pcd_rectified, camera_matrix, (1920, 1080), rvec=rvec, tvec=np.zeros((3, 1)))
 
 
     # ================================================

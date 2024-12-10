@@ -15,7 +15,6 @@ import coloredlogs
 import yaml
 import pyzed.sl as sl
 import matplotlib.pyplot as plt
-from read_write_model import qvec2rotmat
 
 from logger import get_logger
 
@@ -104,19 +103,6 @@ def count_unique_labels(mask_img: np.ndarray):
     
     return len(unique_colors), unique_colors
 
-def R_to_rvec(R: np.ndarray) -> np.ndarray:
-    """Convert rotation matrix to rotation vector."""
-    rvec, _ = cv2.Rodrigues(R)
-    return rvec
-
-def cam_extrinsics(img):
-    R = qvec2rotmat(img.qvec)
-    t = img.tvec.reshape(3,-1)
-    #print(f"R: {R} t: {t}")
-    R_t = np.concatenate((R,t), axis = 1)
-    #R_t = np.vstack([np.array([0,0,0,1]), R_t])
-    R_t = np.vstack([R_t, np.array([0,0,0,1])])
-    return R_t    #  4 * 4 matrix
 
 def crop_pcd(pcd: o3d.t.geometry.PointCloud, bb: dict = None) -> o3d.t.geometry.PointCloud:
     """Crop a point cloud to a specified area."""
