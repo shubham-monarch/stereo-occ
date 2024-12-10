@@ -57,7 +57,7 @@
 
 - fix BEV GT
 - do we need to add real camera extrinsics? 
-- camera instrinsics scaling with image resizing
+- camera instrinsics scaling with image resizing -> [https://chatgpt.com/share/67582768-d0c4-8009-a9b3-edf805c2d2f3]
 - stereo rectification 
 - handle image resizing effect on disparity
 - z / y swap

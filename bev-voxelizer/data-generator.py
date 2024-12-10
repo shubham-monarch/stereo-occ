@@ -20,11 +20,85 @@ class DataGenerator:
         self.logger = get_logger("data-generator")
  
 
-    def s3_data_to_model_data(self, s3_data_dir = None, model_data_dir = None):
+    def raw_data_to_model_data(self, raw_data_dir = None, model_data_dir = None):
+        '''Process raw data and move to model-data folder'''
+
+        assert raw_data_dir is not None, "raw_data_dir is required"
+        assert model_data_dir is not None, "model_data_dir is required"        
+        assert not (os.path.exists(model_data_dir) and os.listdir(model_data_dir)), "model_data_dir must be empty"
+
+
+        # Create the target folder if it doesn't exist
+        os.makedirs(model_data_dir, exist_ok=True)
+
+        # Define the target subfolders
+        left_folder = os.path.join(model_data_dir, 'left')
+        right_folder = os.path.join(model_data_dir, 'right')
+        seg_masks_mono_folder = os.path.join(model_data_dir, 'seg-masks-mono')
+        seg_masks_rgb_folder = os.path.join(model_data_dir, 'seg-masks-rgb')
+        cam_extrinsics_folder = os.path.join(model_data_dir, 'cam-extrinsics')
+
+
+        # Create the target subfolders if they don't exist
+        os.makedirs(left_folder, exist_ok=True)
+        os.makedirs(right_folder, exist_ok=True)
+        os.makedirs(seg_masks_mono_folder, exist_ok=True)
+        os.makedirs(seg_masks_rgb_folder, exist_ok=True)
+        os.makedirs(cam_extrinsics_folder, exist_ok=True)
+
+        # Count total files for progress bar
+        total_files = 0
+        for root, dirs, files in os.walk(raw_data_dir):
+            for file in files:
+                if file.endswith('left.jpg') or \
+                   file.endswith('right.jpg') or \
+                   file.endswith('-mono.png') or \
+                   file.endswith('-rgb.png') or \
+                   file.endswith('cam-extrinsics.npy'):
+                    total_files += 1
+        
+        self.logger.info(f"=========================")
+        self.logger.info(f"Total files: {total_files}") 
+        self.logger.info(f"=========================\n")
+
+        with tqdm(total=total_files, desc="Organizing Images") as pbar:
+            for root, dirs, files in os.walk(raw_data_dir):
+                # Get folder number from root path
+                folder_num = os.path.basename(root)
+                if not folder_num.isdigit():
+                    continue
+
+                for file in files:
+                    if file == 'left.jpg':
+                        new_filename = f"{folder_num}__left.jpg"
+                        shutil.copy(os.path.join(root, file), os.path.join(left_folder, new_filename))
+                        pbar.update(1)
+                    elif file == 'right.jpg':
+                        new_filename = f"{folder_num}__right.jpg"
+                        shutil.copy(os.path.join(root, file), os.path.join(right_folder, new_filename))
+                        pbar.update(1)
+                    elif file == 'seg_mask_mono.png':
+                        new_filename = f"{folder_num}__seg-mask-mono.png"
+                        shutil.copy(os.path.join(root, file), os.path.join(seg_masks_mono_folder, new_filename))
+                        pbar.update(1)
+                    elif file == 'seg_mask_rgb.png':
+                        new_filename = f"{folder_num}__seg-mask-rgb.png"
+                        shutil.copy(os.path.join(root, file), os.path.join(seg_masks_rgb_folder, new_filename))
+                        pbar.update(1)
+                    elif file == 'cam_extrinsics.npy':
+                        new_filename = f"{folder_num}__cam-extrinsics.npy"
+                        shutil.copy(os.path.join(root, file), os.path.join(cam_extrinsics_folder, new_filename))
+                        pbar.update(1)
+
+
+    def s3_data_to_raw_data(self, s3_data_dir = None, raw_data_dir = None):
         '''Process s3 data and move to model-data folder'''
 
         assert s3_data_dir is not None, "s3_data_dir is required"
-        assert model_data_dir is not None, "model_data_dir is required"
+        assert raw_data_dir is not None, "raw_data_dir is required"    
+        assert not (os.path.exists(raw_data_dir) and os.listdir(raw_data_dir)), "raw_data_dir must be empty"
+
+
 
         # walk through s3 data directory
         for root, dirs, files in os.walk(s3_data_dir):
@@ -52,7 +126,7 @@ class DataGenerator:
                         camera_extrinsics = bev_generator.get_updated_camera_extrinsics(pcd_input)
 
                         rel_path = os.path.relpath(root, s3_data_dir)
-                        dest_dir = os.path.join(model_data_dir, rel_path)
+                        dest_dir = os.path.join(raw_data_dir, rel_path)
                         os.makedirs(dest_dir, exist_ok=True)
                         
                         # ================================================
@@ -92,6 +166,8 @@ class DataGenerator:
     def fetch_data_from_s3(self, s3_uri, local_dir):
         '''Fetch data from s3 and save to local directory'''
         
+        assert not (os.path.exists(local_dir) and os.listdir(local_dir)), f"local_dir must be empty!"
+
         s3 = boto3.resource('s3')
         bucket_name, prefix = s3_uri.replace("s3://", "").split("/", 1)
         bucket = s3.Bucket(bucket_name)
@@ -133,10 +209,14 @@ if __name__ == "__main__":
     
     data_generator = DataGenerator()
     
-    s3_uri = "s3://occupancy-dataset/occ-dataset/vineyards/RJM/"
+    # s3_uri = "s3://occupancy-dataset/occ-dataset/vineyards/RJM/"
 
     # fetch data from s3
-    data_generator.fetch_data_from_s3(s3_uri, "aws-data")
+    # data_generator.fetch_data_from_s3(s3_uri, "aws-data")
 
     # process s3 data and move to model-data folder
-    data_generator.s3_data_to_model_data("aws-data", "model-data")
+    # data_generator.s3_data_to_raw_data("aws-data", "model-data")
+
+    # process raw data and move to model-data folder
+    data_generator.raw_data_to_model_data("data/raw-data", "model-data")
+    
