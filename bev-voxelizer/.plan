@@ -16,7 +16,7 @@
 + refactor compute_tilt_matrix()
 + make project_to_ground_plane more robust
 
-- remove main.py
++ remove main.py
 + major refactoring 
 + remove utils folder
 
@@ -25,23 +25,23 @@
     * use CPU parallelization
 
 - get decent baseline results
-- time the dataset generation step
+* time the dataset generation step
 
 - fix BEV GT data
 
-- BEV GT should be centered
-- BEV GT should not have black regions
-- BEV GT should have fixed resolution across files
++ BEV GT should be centered
+* BEV GT should not have black regions
++ BEV GT should have fixed resolution across files
 - input image rectification
+- handle image resizing effect on disparity
 
-
-- fix camera extrinsics 
++ fix camera extrinsics 
 
 * need to shift z as well
 * fix [align normal with +y-axis if angle with y-axis is negative] in [project_to_ground_plane]
 * normalize plane normal --> [a,b,c,d]
 * BEV projection was shifted along y. 
-- [debug] project pointcloud to camera to check camera extrinsics
++ [debug] project pointcloud to camera to check camera extrinsics
 - transpose effect
 - stereo rectification
 - z / y swap 
@@ -51,14 +51,14 @@
 * need to align two axes instead of one
 * [debug] align x and z, and y should automatically align
 
-- generate camera extrinsics as part of dataset
++ generate camera extrinsics as part of dataset
 * why is normal not completely aligning with the y-axis? 
 
-- add test.py
+* add test.py
 - change co-ordinate frame to align with the sbevnet axes
-- update generate-train-data.py
++ update generate-train-data.py
 - sbvenet with only [canopy + navigable-space] as output
 
-- fix yaw / axis-angle logs in bev-generator
+* fix yaw / axis-angle logs in bev-generator
 
 
