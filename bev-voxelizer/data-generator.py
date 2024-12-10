@@ -96,12 +96,13 @@ class DataGenerator:
         bucket_name, prefix = s3_uri.replace("s3://", "").split("/", 1)
         bucket = s3.Bucket(bucket_name)
 
-        # Get all leaf folders
+        # Get all leaf folders and randomly select 200
         leaf_folders = set()
         for obj in bucket.objects.filter(Prefix=prefix):
             leaf_folder = os.path.dirname(obj.key)
             if leaf_folder != prefix:
                 leaf_folders.add(leaf_folder)
+        leaf_folders = set(random.sample(list(leaf_folders), min(200, len(leaf_folders))))
 
         self.logger.info(f"=========================")
         self.logger.info(f"Found {len(leaf_folders)} leaf folders")
