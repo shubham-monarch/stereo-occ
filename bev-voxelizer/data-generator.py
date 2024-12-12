@@ -18,7 +18,47 @@ class DataGenerator:
     
     def __init__(self):
         self.logger = get_logger("data-generator")
- 
+    
+    def rescale_images(self, src_folder = None, dst_folder = None, h = None, w = None):
+        '''Rescale images from (1920, 1080) to (h, w)'''
+
+        assert src_folder is not None, "src_folder is required"
+        assert dst_folder is not None, "dst_folder is required"
+        assert h is not None, "h is required"
+        assert w is not None, "w is required"
+        assert not (os.path.exists(dst_folder) and os.listdir(dst_folder)), "dst_folder must be empty"
+
+        # Create destination folder if it doesn't exist
+        os.makedirs(dst_folder, exist_ok=True)
+
+        # Copy all subfolders from src to dst
+        for item in os.listdir(src_folder):
+            src_path = os.path.join(src_folder, item)
+            dst_path = os.path.join(dst_folder, item)
+            
+            if os.path.isdir(src_path):
+                shutil.copytree(src_path, dst_path)
+            else:
+                shutil.copy2(src_path, dst_path)
+
+        # rescale all images in left and right folders
+        for folder in ['left', 'right']:
+            folder_path = os.path.join(dst_folder, folder)
+            if not os.path.exists(folder_path):
+                continue
+                
+            for img_file in os.listdir(folder_path):
+                img_path = os.path.join(folder_path, img_file)
+                try:
+                    img = cv2.imread(img_path)
+                    resized_img = cv2.resize(img, (w, h))
+                    cv2.imwrite(img_path, resized_img)
+                except Exception as e:
+                    self.logger.error(f"Failed to resize {img_path}: {str(e)}")
+
+
+
+
 
     def raw_data_to_model_data(self, raw_data_dir = None, model_data_dir = None):
         '''Process raw data and move to model-data folder'''
@@ -218,5 +258,9 @@ if __name__ == "__main__":
     # data_generator.s3_data_to_raw_data("aws-data", "model-data")
 
     # process raw data and move to model-data folder
-    data_generator.raw_data_to_model_data("data/raw-data", "model-data")
+    # data_generator.raw_data_to_model_data("data/raw-data", "model-data")
     
+    # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-480x270", h=270, w=480)
+    # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-640x256", h=256, w=640)
+
+    data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-640x480", h=480, w=640)
