@@ -158,9 +158,13 @@ class DataGenerator:
                         crop_bb = {'x_min': -5, 'x_max': 5, 'z_min': 0, 'z_max': 10}
 
                         # mono / rgb segmentation masks
-                        seg_mask_mono, seg_mask_rgb = bev_generator.pcd_to_seg_mask(pcd_input,
-                                                                                    nx, ny,
-                                                                                    crop_bb)
+                        try:
+                            seg_mask_mono, seg_mask_rgb = bev_generator.pcd_to_seg_mask(pcd_input,
+                                                                                        nx, ny,
+                                                                                        crop_bb)
+                        except Exception as e:
+                            self.logger.error(f"Failed to generate segmentation masks: {str(e)}")
+                            raise
                         
                         # camera extrinsics
                         camera_extrinsics = bev_generator.get_updated_camera_extrinsics(pcd_input)
@@ -203,7 +207,7 @@ class DataGenerator:
                         continue
 
 
-    def fetch_data_from_s3(self, s3_uri, local_dir):
+    def fetch_data_from_s3(self, s3_uri, local_dir, num_files=200):
         '''Fetch data from s3 and save to local directory'''
         
         assert not (os.path.exists(local_dir) and os.listdir(local_dir)), f"local_dir must be empty!"
@@ -212,13 +216,13 @@ class DataGenerator:
         bucket_name, prefix = s3_uri.replace("s3://", "").split("/", 1)
         bucket = s3.Bucket(bucket_name)
 
-        # Get all leaf folders and randomly select 200
+        # Get all leaf folders and randomly select num_files
         leaf_folders = set()
         for obj in bucket.objects.filter(Prefix=prefix):
             leaf_folder = os.path.dirname(obj.key)
             if leaf_folder != prefix:
                 leaf_folders.add(leaf_folder)
-        leaf_folders = set(random.sample(list(leaf_folders), min(200, len(leaf_folders))))
+        leaf_folders = set(random.sample(list(leaf_folders), min(num_files, len(leaf_folders))))
 
         self.logger.info(f"=========================")
         self.logger.info(f"Found {len(leaf_folders)} leaf folders")
@@ -249,18 +253,18 @@ if __name__ == "__main__":
     
     data_generator = DataGenerator()
     
-    # s3_uri = "s3://occupancy-dataset/occ-dataset/vineyards/RJM/"
+    # s3_uri = "s3://occupancy-dataset/occ-dataset/vineyards/gallo/"
 
     # fetch data from s3
-    # data_generator.fetch_data_from_s3(s3_uri, "aws-data")
+    # data_generator.fetch_data_from_s3(s3_uri, "data/aws-data/gallo", num_files=300)
 
-    # process s3 data and move to model-data folder
-    # data_generator.s3_data_to_raw_data("aws-data", "model-data")
+    # process s3 data and move to raw-data folder
+    data_generator.s3_data_to_raw_data("data/gallo/aws-data", "data/gallo/raw-data")
 
-    # process raw data and move to model-data folder
-    # data_generator.raw_data_to_model_data("data/raw-data", "model-data")
+    # # process raw data and move to model-data folder
+    # # data_generator.raw_data_to_model_data("data/raw-data", "model-data")
     
-    # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-480x270", h=270, w=480)
-    # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-640x256", h=256, w=640)
+    # # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-480x270", h=270, w=480)
+    # # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-640x256", h=256, w=640)
 
-    data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-640x480", h=480, w=640)
+    # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-640x480", h=480, w=640)
