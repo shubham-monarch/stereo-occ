@@ -141,70 +141,75 @@ class DataGenerator:
 
 
         # walk through s3 data directory
-        for root, dirs, files in os.walk(s3_data_dir):
-            for file in files:
-                if file == 'left-segmented-labelled.ply':
-                    try:
-                        
-                        file_path = os.path.join(root, file)
-                        pcd_input = o3d.t.io.read_point_cloud(file_path)
-                    
-                        bev_generator = BEVGenerator()
-                    
-                        # mask dimensions (400 * 400)
-                        nx , ny = 400, 400
-                        
-                        # crop bounding box
-                        crop_bb = {'x_min': -5, 'x_max': 5, 'z_min': 0, 'z_max': 10}
-
-                        # mono / rgb segmentation masks
+        total_files = sum(1 for root, _, files in os.walk(s3_data_dir) 
+                         for file in files if file == 'left-segmented-labelled.ply')
+        
+        with tqdm(total=total_files, desc="Processing files") as pbar:
+            for root, dirs, files in os.walk(s3_data_dir):
+                for file in files:
+                    if file == 'left-segmented-labelled.ply':
                         try:
-                            seg_mask_mono, seg_mask_rgb = bev_generator.pcd_to_seg_mask(pcd_input,
-                                                                                        nx, ny,
-                                                                                        crop_bb)
-                        except Exception as e:
-                            self.logger.error(f"Failed to generate segmentation masks: {str(e)}")
-                            raise
+                            file_path = os.path.join(root, file)
+                            pcd_input = o3d.t.io.read_point_cloud(file_path)
                         
-                        # camera extrinsics
-                        camera_extrinsics = bev_generator.get_updated_camera_extrinsics(pcd_input)
-
-                        rel_path = os.path.relpath(root, s3_data_dir)
-                        dest_dir = os.path.join(raw_data_dir, rel_path)
-                        os.makedirs(dest_dir, exist_ok=True)
+                            bev_generator = BEVGenerator()
                         
-                        # ================================================
-                        # copy left and right images
-                        # ================================================
-                        for img_file in ['left.jpg', 'right.jpg']:
-                            try:
-                                src_file = os.path.join(root, img_file)
-                                if os.path.exists(src_file):
-                                    dest_file = os.path.join(dest_dir, img_file)
-                                    shutil.copy2(src_file, dest_file)
-                            except (IOError, OSError) as e:
-                                self.logger.error(f"Failed to copy {img_file}: {str(e)}")
-
-                        # ================================================
-                        # save segmentation masks
-                        # ================================================
-                        try:
-                            cv2.imwrite(os.path.join(dest_dir, 'seg_mask_mono.png'), seg_mask_mono)
-                            cv2.imwrite(os.path.join(dest_dir, 'seg_mask_rgb.png'), seg_mask_rgb)
-                        except Exception as e:
-                            self.logger.error(f"Failed to save segmentation masks: {str(e)}")
-
-                        # ================================================
-                        # save camera extrinsics
-                        # ================================================
-                        try:
-                            np.save(os.path.join(dest_dir, 'cam_extrinsics.npy'), camera_extrinsics)
-                        except Exception as e:
-                            self.logger.error(f"Failed to save camera extrinsics: {str(e)}")
+                            # mask dimensions (400 * 400)
+                            nx , ny = 400, 400
                             
-                    except Exception as e:
-                        self.logger.error(f"Failed to process {file}: {str(e)}")
-                        continue
+                            # crop bounding box
+                            crop_bb = {'x_min': -5, 'x_max': 5, 'z_min': 0, 'z_max': 10}
+
+                            # mono / rgb segmentation masks
+                            try:
+                                seg_mask_mono, seg_mask_rgb = bev_generator.pcd_to_seg_mask(pcd_input,
+                                                                                            nx, ny,
+                                                                                            crop_bb)
+                            except Exception as e:
+                                self.logger.error(f"Failed to generate segmentation masks: {str(e)}")
+                                raise
+                            
+                            # camera extrinsics
+                            camera_extrinsics = bev_generator.get_updated_camera_extrinsics(pcd_input)
+
+                            rel_path = os.path.relpath(root, s3_data_dir)
+                            dest_dir = os.path.join(raw_data_dir, rel_path)
+                            os.makedirs(dest_dir, exist_ok=True)
+                            
+                            # ================================================
+                            # copy left and right images
+                            # ================================================
+                            for img_file in ['left.jpg', 'right.jpg']:
+                                try:
+                                    src_file = os.path.join(root, img_file)
+                                    if os.path.exists(src_file):
+                                        dest_file = os.path.join(dest_dir, img_file)
+                                        shutil.copy2(src_file, dest_file)
+                                except (IOError, OSError) as e:
+                                    self.logger.error(f"Failed to copy {img_file}: {str(e)}")
+
+                            # ================================================
+                            # save segmentation masks
+                            # ================================================
+                            try:
+                                cv2.imwrite(os.path.join(dest_dir, 'seg_mask_mono.png'), seg_mask_mono)
+                                cv2.imwrite(os.path.join(dest_dir, 'seg_mask_rgb.png'), seg_mask_rgb)
+                            except Exception as e:
+                                self.logger.error(f"Failed to save segmentation masks: {str(e)}")
+
+                            # ================================================
+                            # save camera extrinsics
+                            # ================================================
+                            try:
+                                np.save(os.path.join(dest_dir, 'cam_extrinsics.npy'), camera_extrinsics)
+                            except Exception as e:
+                                self.logger.error(f"Failed to save camera extrinsics: {str(e)}")
+                            
+                            pbar.update(1)
+                            
+                        except Exception as e:
+                            self.logger.error(f"Failed to process {file}: {str(e)}")
+                            continue
 
 
     def fetch_data_from_s3(self, s3_uri, local_dir, num_files=200):
