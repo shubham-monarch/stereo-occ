@@ -74,7 +74,7 @@ class DataGenerator:
         self.logger.info(f"=========================")
         self.logger.info(f"Processing raw data from {raw_data_dir} to {model_data_dir}")
         self.logger.info(f"=========================\n")
-    
+
         # Create the target folder if it doesn't exist
         os.makedirs(model_data_dir, exist_ok=True)
 
@@ -261,6 +261,80 @@ class DataGenerator:
 
         pbar_folders.close()
 
+    def upload_to_s3(self, local_dir = None, s3_uri = None):
+        """Upload model-data folders from local directory to S3"""
+        
+        assert local_dir is not None, "local_dir is required"
+        assert s3_uri is not None, "s3_uri is required"
+        
+        # Parse S3 URI to get bucket and prefix
+        s3_parts = s3_uri.replace("s3://", "").split("/")
+        bucket = s3_parts[0]
+        prefix = "/".join(s3_parts[1:]) if len(s3_parts) > 1 else ""
+        
+        # Initialize S3 client
+        s3_client = boto3.client('s3')
+        
+        # Find all model-data folders
+        model_data_folders = [d for d in os.listdir(local_dir) 
+                             if os.path.isdir(os.path.join(local_dir, d)) and 
+                             d.startswith('model-data-')]
+        
+        if not model_data_folders:
+            self.logger.warning(f"No model-data folders found in {local_dir}")
+            return
+        
+        self.logger.info(f"=========================")
+        self.logger.info(f"Found model-data folders: {model_data_folders}")
+        self.logger.info(f"Uploading to {s3_uri}")
+        self.logger.info(f"=========================\n")
+        
+        # Count total files for progress bar
+        total_files = sum(len(files) for folder in model_data_folders 
+                         for _, _, files in os.walk(os.path.join(local_dir, folder)))
+        
+        with tqdm(total=total_files, desc="Uploading files", unit='file') as pbar:
+            # Walk through each model-data folder
+            for folder in model_data_folders:
+                folder_path = os.path.join(local_dir, folder)
+
+                # self.logger.info(f"=========================    ")
+                # self.logger.info(f"folder_path: {folder_path}")
+                # self.logger.info(f"=========================\n")
+                
+                
+                for root, _, files in os.walk(folder_path):
+                    for filename in files:
+                        # Get full local file path
+                        file_path = os.path.join(root, filename)
+                        
+                        # Calculate relative path from the model-data folder
+                        relative_path = os.path.relpath(file_path, folder_path)
+                        
+                        # Create base S3 path
+                        base_s3_path = f"{prefix}/{os.path.basename(local_dir)}"
+
+                        # Construct S3 key with prefix and folder name
+                        s3_key = f"{base_s3_path}/{folder}/{relative_path}".replace("\\", "/")
+                        
+                        # self.logger.info(f"=========================    ")
+                        # self.logger.info(f"prefix: {prefix}")
+                        # self.logger.info(f"base_s3_path: {base_s3_path}")
+                        # self.logger.info(f"s3_key: {s3_key}")   
+                        # self.logger.info(f"file_path: {file_path}")
+                        # self.logger.info(f"bucket: {bucket}")
+                        # self.logger.info(f"=========================\n")
+                        # continue
+                        
+                        # Upload file
+                        try:
+                            s3_client.upload_file(file_path, bucket, s3_key)
+                            pbar.update(1)
+                        except Exception as e:
+                            self.logger.error(f"Error uploading {file_path}: {str(e)}")
+
+      
+    
 if __name__ == "__main__":
     
     data_generator = DataGenerator()
@@ -274,9 +348,11 @@ if __name__ == "__main__":
     # data_generator.s3_data_to_raw_data("data/gallo/aws-data", "data/gallo/raw-data")
 
     # # process raw data and move to model-data folder
-    data_generator.raw_data_to_model_data("data/gallo/raw-data", "data/gallo/model-data-1920x1080")
+    # data_generator.raw_data_to_model_data("data/gallo/raw-data", "data/gallo/model-data-1920x1080")
     
     # rescale images to 640x480
-    data_generator.rescale_images(src_folder="data/gallo/model-data-1920x1080", dst_folder="data/gallo/model-data-640x480", h=480, w=640)
+    # data_generator.rescale_images(src_folder="data/gallo/model-data-1920x1080", dst_folder="data/gallo/model-data-640x480", h=480, w=640)
 
-    
+    # upload to s3
+    data_generator.upload_to_s3(local_dir="data/RJM", 
+                                s3_uri="s3://occupancy-dataset/bev-dataset")
