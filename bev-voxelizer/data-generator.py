@@ -31,6 +31,10 @@ class DataGenerator:
         # Create destination folder if it doesn't exist
         os.makedirs(dst_folder, exist_ok=True)
 
+        self.logger.info(f"=========================")
+        self.logger.info(f"Rescaling images from {src_folder} to {dst_folder}")
+        self.logger.info(f"=========================\n")
+
         # Copy all subfolders from src to dst
         for item in os.listdir(src_folder):
             src_path = os.path.join(src_folder, item)
@@ -67,7 +71,10 @@ class DataGenerator:
         assert model_data_dir is not None, "model_data_dir is required"        
         assert not (os.path.exists(model_data_dir) and os.listdir(model_data_dir)), "model_data_dir must be empty"
 
-
+        self.logger.info(f"=========================")
+        self.logger.info(f"Processing raw data from {raw_data_dir} to {model_data_dir}")
+        self.logger.info(f"=========================\n")
+    
         # Create the target folder if it doesn't exist
         os.makedirs(model_data_dir, exist_ok=True)
 
@@ -264,12 +271,12 @@ if __name__ == "__main__":
     # data_generator.fetch_data_from_s3(s3_uri, "data/aws-data/gallo", num_files=300)
 
     # process s3 data and move to raw-data folder
-    data_generator.s3_data_to_raw_data("data/gallo/aws-data", "data/gallo/raw-data")
+    # data_generator.s3_data_to_raw_data("data/gallo/aws-data", "data/gallo/raw-data")
 
     # # process raw data and move to model-data folder
-    # # data_generator.raw_data_to_model_data("data/raw-data", "model-data")
+    data_generator.raw_data_to_model_data("data/gallo/raw-data", "data/gallo/model-data-1920x1080")
     
-    # # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-480x270", h=270, w=480)
-    # # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-640x256", h=256, w=640)
+    # rescale images to 640x480
+    data_generator.rescale_images(src_folder="data/gallo/model-data-1920x1080", dst_folder="data/gallo/model-data-640x480", h=480, w=640)
 
-    # data_generator.rescale_images(src_folder="data/model-data-1920x1080", dst_folder="data/model-data-640x480", h=480, w=640)
+    
