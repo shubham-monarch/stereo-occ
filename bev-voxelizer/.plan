@@ -77,3 +77,13 @@
 
 - add utility to push model-data to s3
 
+
+======================
+aws based bev-generator
+======================
+- start aws based data-generation pipeline
+- index to track processed files
+- ipm rgb 
+- occlusion mask
+- add index.json
+

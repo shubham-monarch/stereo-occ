@@ -61,9 +61,6 @@ class DataGenerator:
                     self.logger.error(f"Failed to resize {img_path}: {str(e)}")
 
 
-
-
-
     def raw_data_to_model_data(self, raw_data_dir = None, model_data_dir = None):
         '''Process raw data and move to model-data folder'''
 
