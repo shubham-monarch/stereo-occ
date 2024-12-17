@@ -86,4 +86,6 @@ aws based bev-generator
 - ipm rgb 
 - occlusion mask
 - add index.json
-
+- ability to resume 
+- data field agnostic resumption [i.e. left / right / mono / seg-masks-mono / seg-masks-rgb/ occlusion-mask]
+- upload index to s3
