@@ -94,3 +94,4 @@ aws based bev-generator
 - close s3 client when leafFolder goes out of scope
 - add leafFolder destructor
 - better name for leafFolder
+- upload  scaled images

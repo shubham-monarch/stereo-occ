@@ -546,7 +546,10 @@ class BEVGenerator:
                              nx: int = None, nz: int = None, 
                              bb: dict = None) -> Tuple[np.ndarray, np.ndarray]:
         
-        '''Generate mono / rgb segmentation masks from a pointcloud'''        
+        '''Generate mono / rgb segmentation masks from a pointcloud
+        :returns: (mono seg mask, rgb seg mask)
+        '''
+                
         assert bb is not None, "Bounding box parameters are required!"
         assert nx is not None and nz is not None, "nx and nz must be provided!"
         

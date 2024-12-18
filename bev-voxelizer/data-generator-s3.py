@@ -6,9 +6,10 @@ import random
 from logger import get_logger
 from typing import List
 from tqdm import tqdm
+import open3d as o3d
+import numpy as np
 
 from bev_generator import BEVGenerator
-
 
 class LeafFolder:
     def __init__(self, src_URI: str, dest_URI: str):
@@ -28,8 +29,25 @@ class LeafFolder:
     def process_folder(self):
         
         # 1. download left-segmented-labelled.ply
-        self.download_segmented_pcd()
+        pcd_path = self.download_segmented_pcd(self.src_URI)
 
+        # # 2. generate mono / RGB segmentation masks
+        # pcd = o3d.t.io.read_point_cloud(pcd_path)
+        
+        # # mask dimensions
+        # nx, nz = 256, 256
+        # # z is depth, x is horizontal
+        # crop_bb = {'x_min': -2.5, 'x_max': 2.5, 'z_min': 0.0001, 'z_max': 5}        
+        
+        # seg_mask_mono, seg_mask_rgb = self.bev_generator.pcd_to_seg_mask(pcd,
+        #                                                                  nx=256,nz=256,
+        #                                                                  bb=crop_bb)
+        
+        # # 3. upload seg_mask_mono and seg_mask_rgb as .png
+        # self.upload_png(seg_mask_mono, )
+        # # self.upload_seg_rgb(seg_mask_rgb)
+
+        
         # 2. copy imgL
         # 3. copy imgR
         # 4. upload seg_mono
@@ -41,7 +59,10 @@ class LeafFolder:
 
         pass
 
-    
+        
+    def rescale_img(self, img_uri: str):
+        pass
+
 
     def copy_imgL(self, imgL_uri: str):
         pass
@@ -49,10 +70,7 @@ class LeafFolder:
     def copy_imgR(self, imgR_uri: str):
         pass
 
-    def upload_seg_mono(self, seg_mono_uri: str):
-        pass
-
-    def upload_seg_rgb(self, seg_rgb_uri: str):
+    def upload_png(self, seg_mask: np.ndarray):
         pass
 
     def upload_ipm_fea(self, ipm_fea_uri: str):
@@ -61,19 +79,30 @@ class LeafFolder:
     def upload_ipm_rgb(self, ipm_seg_uri: str):
         pass
 
-    def download_segmented_pcd(self):
+    def download_file(self, src_URI: str, dest_folder: str) -> str:
+        ''' Download a file from S3 to dest_folder'''
+        
+        bucket_name, key = src_URI.replace("s3://", "").split("/", 1)
+        file_name = key.split("/")[-1]
+        
+        os.makedirs(dest_folder, exist_ok=True)
+        path_tmp = os.path.join(dest_folder, file_name)
+        
+        self.s3.download_file(bucket_name, key, path_tmp)
+        return path_tmp
+        
+    def upload_file(self, src_path: str, dest_URI: str) -> bool:
+        ''' Upload a file from src_path to dest_URI'''
+        pass
+
+    def download_segmented_pcd(self, folder_URI: str) -> str:
         self.logger.info(f"=======================")
         self.logger.info(f"Downloading left-segmented-labelled.ply!")
         self.logger.info(f"=======================\n")
         
-        segmented_pcd_uri = self.src_URI + f"left-segmented-labelled.ply" 
-        bucket_name, key = segmented_pcd_uri.replace("s3://", "").split("/", 1)
+        segmented_pcd_uri = folder_URI + f"left-segmented-labelled.ply" 
+        return self.download_file(segmented_pcd_uri, "tmp-pcd")
                 
-        os.makedirs("tmp", exist_ok=True)
-        path_tmp = os.path.join("tmp", "left-segmented-labelled.ply")
-        
-        self.s3.download_file(bucket_name, key, path_tmp)
-        return path_tmp
 
         
 
