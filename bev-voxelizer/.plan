@@ -89,3 +89,8 @@ aws based bev-generator
 - ability to resume 
 - data field agnostic resumption [i.e. left / right / mono / seg-masks-mono / seg-masks-rgb/ occlusion-mask]
 - upload index to s3
+
+
+- close s3 client when leafFolder goes out of scope
+- add leafFolder destructor
+- better name for leafFolder
