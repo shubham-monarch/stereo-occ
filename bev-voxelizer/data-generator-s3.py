@@ -8,6 +8,7 @@ from typing import List
 from tqdm import tqdm
 import open3d as o3d
 import numpy as np
+import cv2
 
 from bev_generator import BEVGenerator
 
@@ -28,25 +29,32 @@ class LeafFolder:
     
     def process_folder(self):
         
+        # ==================
         # 1. download left-segmented-labelled.ply
+        # ==================
         pcd_path = self.download_segmented_pcd(self.src_URI)
 
-        # # 2. generate mono / RGB segmentation masks
-        # pcd = o3d.t.io.read_point_cloud(pcd_path)
+        # ==================
+        # 2. generate mono / RGB segmentation masks
+        # ==================
+        pcd = o3d.t.io.read_point_cloud(pcd_path)
         
-        # # mask dimensions
-        # nx, nz = 256, 256
-        # # z is depth, x is horizontal
-        # crop_bb = {'x_min': -2.5, 'x_max': 2.5, 'z_min': 0.0001, 'z_max': 5}        
-        
-        # seg_mask_mono, seg_mask_rgb = self.bev_generator.pcd_to_seg_mask(pcd,
-        #                                                                  nx=256,nz=256,
-        #                                                                  bb=crop_bb)
-        
-        # # 3. upload seg_mask_mono and seg_mask_rgb as .png
-        # self.upload_png(seg_mask_mono, )
-        # # self.upload_seg_rgb(seg_mask_rgb)
+        # mask dimensions
+        nx, nz = 256, 256
 
+        # z is depth, x is horizontal
+        crop_bb = {'x_min': -2.5, 'x_max': 2.5, 'z_min': 0.0, 'z_max': 5}        
+        
+        seg_mask_mono, seg_mask_rgb = self.bev_generator.pcd_to_seg_mask(pcd,
+                                                                         nx=256,nz=256,
+                                                                         bb=crop_bb)
+        
+        # ==================
+        # 3. upload mono / RGB segmentation masks
+        # ==================
+        self.upload_mask(seg_mask_mono, self.dest_URI + "seg-mask-mono.png")
+        self.upload_mask(seg_mask_rgb, self.dest_URI + "seg-mask-rgb.png")
+        
         
         # 2. copy imgL
         # 3. copy imgR
@@ -79,21 +87,50 @@ class LeafFolder:
     def upload_ipm_rgb(self, ipm_seg_uri: str):
         pass
 
-    def download_file(self, src_URI: str, dest_folder: str) -> str:
-        ''' Download a file from S3 to dest_folder'''
-        
-        bucket_name, key = src_URI.replace("s3://", "").split("/", 1)
-        file_name = key.split("/")[-1]
-        
-        os.makedirs(dest_folder, exist_ok=True)
-        path_tmp = os.path.join(dest_folder, file_name)
-        
-        self.s3.download_file(bucket_name, key, path_tmp)
-        return path_tmp
-        
     def upload_file(self, src_path: str, dest_URI: str) -> bool:
-        ''' Upload a file from src_path to dest_URI'''
-        pass
+        ''' Upload a file from src_path to dest_URI'''      
+        
+        try:
+            bucket_name, key = dest_URI.replace("s3://", "").split("/", 1)
+            self.s3.upload_file(src_path, bucket_name, key)
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to upload file {src_path} to {dest_URI}: {str(e)}")
+            return False
+
+    def download_file(self, src_URI: str, dest_folder: str) -> str:
+        ''' Download a file from S3 to the dest_folder'''
+        
+        try:
+            bucket_name, key = src_URI.replace("s3://", "").split("/", 1)
+            file_name = key.split("/")[-1]
+            
+            os.makedirs(dest_folder, exist_ok=True)
+            tmp_path = os.path.join(dest_folder, file_name)
+            
+            self.s3.download_file(bucket_name, key, tmp_path)
+            return tmp_path
+        except Exception as e:
+            self.logger.error(f"Failed to download file from {src_URI} to {dest_folder}: {str(e)}")
+            raise
+    
+    
+    def upload_mask(self, mask: np.ndarray, mask_uri: str) -> bool:
+        """Save mask as PNG and upload to S3"""
+        
+        os.makedirs("tmp-masks", exist_ok=True)
+        tmp_path = os.path.join("tmp-masks", "tmp_mask.png")
+        cv2.imwrite(tmp_path, mask)
+        
+        # upload to S3
+        success = self.upload_file(tmp_path, mask_uri)
+        
+        # clean-up   
+        if success:
+            os.remove(tmp_path)
+        
+        return success
+
 
     def download_segmented_pcd(self, folder_URI: str) -> str:
         self.logger.info(f"=======================")
@@ -210,7 +247,7 @@ if __name__ == "__main__":
     logger.info(f"=======================")
     logger.info(f"leaf_URI_src: {leaf_URI_src}")
     logger.info(f"leaf_URI_dest: {leaf_URI_dest}")
-    logger.info(f"=======================")
+    logger.info(f"=======================\n")
 
     leafFolder = LeafFolder(leaf_URI_src, leaf_URI_dest)
     leafFolder.process_folder()
