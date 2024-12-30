@@ -1,0 +1,8 @@
+[submodule "bev_mask_generator"]
+	path = bev_mask_generator
+	url = git@github.com:shubham-monarch/bev_mask_generator.git
+	branch = dev
+[submodule "sbevnet"]
+	path = sbevnet
+	url = git@github.com:shubham-monarch/sbevnet.git
+	branch = dev
